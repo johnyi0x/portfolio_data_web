@@ -14,6 +14,8 @@ export type PairRow = {
   agreement: number;
   leverage: number;
   rankDelta: number | null;
+  price: number | null;
+  changePct: number | null;
 };
 
 export type BoardSnapshot = {
@@ -50,4 +52,40 @@ export function formatUtcStamp(value: Date | string | null | undefined): string 
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+}
+
+export function formatPx(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1000) {
+    return n.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+    });
+  }
+  if (abs >= 1) {
+    return n.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+  }
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 6,
+  });
+}
+
+export function formatPxCompact(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return "";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (abs >= 10_000) return `${(n / 1000).toFixed(1)}k`;
+  return formatPx(n);
+}
+
+export function formatChgPct(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const pct = n * 100;
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct.toFixed(2)}%`;
 }

@@ -28,8 +28,10 @@ export default function AboutPage() {
         <p>
           bagrank sits in the middle. Every hour it asks: of the 200 wallets
           that have been making money lately, what are they holding as a
-          group? That is crowd positioning, not a price, not a copy-trade
-          signal, and not “follow wallet #1.”
+          group? That is crowd positioning, not a copy-trade signal, and not
+          “follow wallet #1.” The leaderboard also shows each pair’s mark at
+          snapshot time so you can read the board against price, not rank
+          alone.
         </p>
         <p>
           If 40 of those 200 are long HYPE, that is a different story than
@@ -44,8 +46,9 @@ export default function AboutPage() {
         <p>
           Each hour: take the top 200 Hyperliquid wallets by 7-day ROI,
           snapshot their open perps, then rank pairs by how many of those
-          wallets are in them. Cash is not a pair. This is not a Nasdaq-style
-          index with a price.
+          wallets are in them. Cash is not a pair. Rank is wallet count, not
+          a Nasdaq-style index. Each hour also stores that pair’s mark and
+          1h candle so later hours are not a board without a price.
         </p>
       </section>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PairRow } from "@/lib/board";
+import { formatChgPct, formatPx, type PairRow } from "@/lib/board";
 
 const PAGE_SIZE = 20;
 
@@ -21,6 +21,14 @@ function RankMove({ delta }: { delta: number | null }) {
 
 function pct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
+}
+
+function PxChange({ value }: { value: number | null }) {
+  if (value == null || !Number.isFinite(value)) {
+    return <span className="muted">—</span>;
+  }
+  const cls = value > 0 ? "px-chg up" : value < 0 ? "px-chg down" : "px-chg";
+  return <span className={cls}>{formatChgPct(value)}</span>;
 }
 
 export function Leaderboard({ rows }: { rows: PairRow[] }) {
@@ -44,6 +52,15 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
           <tr>
             <th className="num">rank#</th>
             <th>Pair</th>
+            <th className="num" title="Mark at snapshot, else 1h close">
+              Price
+            </th>
+            <th
+              className="num"
+              title="Change vs previous hour mark, else vs this hour's open"
+            >
+              1h
+            </th>
             <th>Side</th>
             <th className="num">Hold</th>
             <th className="num">Wallets</th>
@@ -63,6 +80,10 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
                   {row.dex ? <span className="dex">{row.dex}</span> : null}
                   <RankMove delta={row.rankDelta} />
                 </span>
+              </td>
+              <td className="num">{formatPx(row.price)}</td>
+              <td className="num">
+                <PxChange value={row.changePct} />
               </td>
               <td>
                 <span className={row.side === "long" ? "tag long" : "tag short"}>

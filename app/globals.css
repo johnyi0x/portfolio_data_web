@@ -467,6 +467,18 @@ th {
   color: var(--short);
 }
 
+.px-chg {
+  font-variant-numeric: tabular-nums;
+}
+
+.px-chg.up {
+  color: var(--long);
+}
+
+.px-chg.down {
+  color: var(--short);
+}
+
 .tag,
 .status {
   display: inline-block;

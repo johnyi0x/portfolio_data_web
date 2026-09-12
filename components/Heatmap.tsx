@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PairRow } from "@/lib/board";
+import { formatPxCompact, type PairRow } from "@/lib/board";
 import { squarify } from "@/lib/squarify";
 
 function tileFill(row: PairRow): string {
@@ -119,7 +119,8 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
             ) : null}
             {type.showSub ? (
               <span className="heat-sub" style={{ fontSize: `${type.sub}px` }}>
-                {row.wallets}/{row.onCoin} · agr {Math.round(row.agreement * 100)}% · {row.leverage}x
+                {row.wallets}/{row.onCoin} · agr {Math.round(row.agreement * 100)}%
+                {row.price ? ` · ${formatPxCompact(row.price)}` : ""} · {row.leverage}x
               </span>
             ) : null}
           </div>

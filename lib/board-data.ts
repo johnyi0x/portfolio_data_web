@@ -29,12 +29,30 @@ type RunRow = {
   median_leverage: number | string | null;
   rank: number | string | null;
   prev_rank: number | string | null;
+  mark_px: number | string | null;
+  ohlc_close: number | string | null;
+  ohlc_open: number | string | null;
+  prev_mark_px: number | string | null;
+  prev_ohlc_close: number | string | null;
 };
 
 function num(value: unknown, fallback = 0): number {
   if (value == null || value === "") return fallback;
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function numOrNull(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function changePct(price: number | null, prev: number | null, open: number | null): number | null {
+  if (price == null) return null;
+  if (prev != null && prev > 0) return (price - prev) / prev;
+  if (open != null && open > 0) return (price - open) / open;
+  return null;
 }
 
 function emptyBoard(partial: Partial<BoardSnapshot> = {}): BoardSnapshot {
@@ -59,6 +77,9 @@ function toPairRow(row: RunRow): PairRow | null {
   const longN = num(row.long_n);
   const shortN = num(row.short_n);
   const { label, dex } = splitCoin(row.coin);
+  const price = numOrNull(row.mark_px) ?? numOrNull(row.ohlc_close);
+  const prevPrice = numOrNull(row.prev_mark_px) ?? numOrNull(row.prev_ohlc_close);
+  const open = numOrNull(row.ohlc_open);
   return {
     rank: num(row.rank),
     coin: row.coin,
@@ -76,6 +97,8 @@ function toPairRow(row: RunRow): PairRow | null {
       row.prev_rank == null || row.prev_rank === ""
         ? null
         : num(row.prev_rank) - num(row.rank),
+    price,
+    changePct: changePct(price, prevPrice, open),
   };
 }
 
@@ -89,7 +112,73 @@ async function loadLatestBoard(): Promise<BoardSnapshot> {
   }
 
   try {
-    const rows = (await sql`
+    const rows = await queryLatestBoard(sql, true);
+    return boardFromRows(rows);
+  } catch (err) {
+    if (isMissingCoinPrices(err)) {
+      try {
+        const rows = await queryLatestBoard(sql, false);
+        return boardFromRows(rows);
+      } catch (retryErr) {
+        return boardQueryError(retryErr);
+      }
+    }
+    return boardQueryError(err);
+  }
+}
+
+function boardFromRows(rows: RunRow[]): BoardSnapshot {
+  if (!rows.length) {
+    return emptyBoard({
+      error: "No snapshot in Neon yet",
+    });
+  }
+
+  const head = rows[0];
+  const pairRows = rows
+    .map(toPairRow)
+    .filter((row): row is PairRow => row != null);
+
+  return {
+    configured: true,
+    error: null,
+    cycleTs: formatUtcStamp(head.cycle_ts),
+    capturedAt: formatUtcStamp(head.finished_at) ?? formatUtcStamp(head.cycle_ts),
+    listed: Math.max(1, Math.round(num(head.listed, 200))),
+    snappedOk: Math.max(0, Math.round(num(head.snapped_ok))),
+    status: head.status,
+    coverage: head.coverage == null ? null : num(head.coverage),
+    rankWindow: rankWindowLabel(RANK_WINDOW),
+    rows: pairRows,
+  };
+}
+
+function isMissingCoinPrices(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /coin_prices/i.test(message) && /does not exist/i.test(message);
+}
+
+function boardQueryError(err: unknown): BoardSnapshot {
+  const message = err instanceof Error ? err.message : "Neon query failed";
+  const missing =
+    /relation .* does not exist/i.test(message) ||
+    (typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      err.code === "42P01");
+  return emptyBoard({
+    error: missing
+      ? "Collector tables not found on this Neon database"
+      : message,
+  });
+}
+
+async function queryLatestBoard(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  withPrices: boolean,
+): Promise<RunRow[]> {
+  if (withPrices) {
+    return (await sql`
       WITH latest AS (
         SELECT cycle_ts, listed, snapped_ok, status, finished_at, coverage
         FROM collector_runs
@@ -123,7 +212,12 @@ async function loadLatestBoard(): Promise<BoardSnapshot> {
         m.short_n,
         m.median_leverage,
         m.rank,
-        p.rank AS prev_rank
+        p.rank AS prev_rank,
+        cp.mark_px,
+        cp.ohlc_close,
+        cp.ohlc_open,
+        cpp.mark_px AS prev_mark_px,
+        cpp.ohlc_close AS prev_ohlc_close
       FROM latest l
       LEFT JOIN meta_index m
         ON m.cycle_ts = l.cycle_ts
@@ -132,46 +226,68 @@ async function loadLatestBoard(): Promise<BoardSnapshot> {
         ON p.cycle_ts = (SELECT cycle_ts FROM prev_cycle)
        AND p.venue = ${VENUE}
        AND p.coin = m.coin
+      LEFT JOIN coin_prices cp
+        ON cp.cycle_ts = l.cycle_ts
+       AND cp.venue = ${VENUE}
+       AND cp.coin = m.coin
+      LEFT JOIN coin_prices cpp
+        ON cpp.cycle_ts = (SELECT cycle_ts FROM prev_cycle)
+       AND cpp.venue = ${VENUE}
+       AND cpp.coin = m.coin
       ORDER BY m.rank ASC NULLS LAST
     `) as RunRow[];
-
-    if (!rows.length) {
-      return emptyBoard({
-        error: "No snapshot in Neon yet",
-      });
-    }
-
-    const head = rows[0];
-    const pairRows = rows
-      .map(toPairRow)
-      .filter((row): row is PairRow => row != null);
-
-    return {
-      configured: true,
-      error: null,
-      cycleTs: formatUtcStamp(head.cycle_ts),
-      capturedAt: formatUtcStamp(head.finished_at) ?? formatUtcStamp(head.cycle_ts),
-      listed: Math.max(1, Math.round(num(head.listed, 200))),
-      snappedOk: Math.max(0, Math.round(num(head.snapped_ok))),
-      status: head.status,
-      coverage: head.coverage == null ? null : num(head.coverage),
-      rankWindow: rankWindowLabel(RANK_WINDOW),
-      rows: pairRows,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Neon query failed";
-    const missing =
-      /relation .* does not exist/i.test(message) ||
-      (typeof err === "object" &&
-        err !== null &&
-        "code" in err &&
-        err.code === "42P01");
-    return emptyBoard({
-      error: missing
-        ? "Collector tables not found on this Neon database"
-        : message,
-    });
   }
+
+  return (await sql`
+    WITH latest AS (
+      SELECT cycle_ts, listed, snapped_ok, status, finished_at, coverage
+      FROM collector_runs
+      WHERE venue = ${VENUE}
+        AND status IN ('ok', 'partial')
+      ORDER BY cycle_ts DESC
+      LIMIT 1
+    ),
+    prev_cycle AS (
+      SELECT cycle_ts
+      FROM collector_runs
+      WHERE venue = ${VENUE}
+        AND status IN ('ok', 'partial')
+        AND cycle_ts < (SELECT cycle_ts FROM latest)
+      ORDER BY cycle_ts DESC
+      LIMIT 1
+    )
+    SELECT
+      l.cycle_ts,
+      l.listed,
+      l.snapped_ok,
+      l.status,
+      l.finished_at,
+      l.coverage,
+      m.coin,
+      m.side,
+      m.wallets,
+      m.hold_pct,
+      m.agreement,
+      m.long_n,
+      m.short_n,
+      m.median_leverage,
+      m.rank,
+      p.rank AS prev_rank,
+      NULL::numeric AS mark_px,
+      NULL::numeric AS ohlc_close,
+      NULL::numeric AS ohlc_open,
+      NULL::numeric AS prev_mark_px,
+      NULL::numeric AS prev_ohlc_close
+    FROM latest l
+    LEFT JOIN meta_index m
+      ON m.cycle_ts = l.cycle_ts
+     AND m.venue = ${VENUE}
+    LEFT JOIN meta_index p
+      ON p.cycle_ts = (SELECT cycle_ts FROM prev_cycle)
+     AND p.venue = ${VENUE}
+     AND p.coin = m.coin
+    ORDER BY m.rank ASC NULLS LAST
+  `) as RunRow[];
 }
 
 export const getLatestBoard = unstable_cache(loadLatestBoard, ["board", VENUE], {
