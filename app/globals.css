@@ -332,15 +332,16 @@ body {
 
 .heat-mark {
   position: absolute;
-  top: 12px;
-  right: 14px;
+  top: 6px;
+  right: 12px;
   z-index: 3;
   pointer-events: none;
-  font-size: clamp(22px, 4.2vw, 34px);
+  font-size: clamp(18px, 3.5vw, 28px);
   font-weight: 650;
   letter-spacing: -0.045em;
+  line-height: 1;
   color: var(--ink);
-  opacity: 0.28;
+  opacity: 0.26;
 }
 
 .heat-cell {
@@ -444,6 +445,26 @@ th {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 2px 6px;
+}
+
+.rank-move {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-move.up {
+  color: var(--long);
+}
+
+.rank-move.down {
+  color: var(--short);
 }
 
 .tag,
@@ -605,5 +626,11 @@ th {
 
   .heatmap {
     min-height: 420px;
+  }
+
+  .heat-mark {
+    top: 8px;
+    right: 10px;
+    font-size: 18px;
   }
 }

@@ -13,6 +13,7 @@ export type PairRow = {
   holdPct: number;
   agreement: number;
   leverage: number;
+  rankDelta: number | null;
 };
 
 export type BoardSnapshot = {

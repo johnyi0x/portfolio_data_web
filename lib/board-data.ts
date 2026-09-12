@@ -28,6 +28,7 @@ type RunRow = {
   short_n: number | string | null;
   median_leverage: number | string | null;
   rank: number | string | null;
+  prev_rank: number | string | null;
 };
 
 function num(value: unknown, fallback = 0): number {
@@ -71,6 +72,10 @@ function toPairRow(row: RunRow): PairRow | null {
     holdPct: num(row.hold_pct),
     agreement: num(row.agreement),
     leverage: Math.max(1, Math.round(num(row.median_leverage, 1))),
+    rankDelta:
+      row.prev_rank == null || row.prev_rank === ""
+        ? null
+        : num(row.prev_rank) - num(row.rank),
   };
 }
 
@@ -92,6 +97,15 @@ async function loadLatestBoard(): Promise<BoardSnapshot> {
           AND status IN ('ok', 'partial')
         ORDER BY cycle_ts DESC
         LIMIT 1
+      ),
+      prev_cycle AS (
+        SELECT cycle_ts
+        FROM collector_runs
+        WHERE venue = ${VENUE}
+          AND status IN ('ok', 'partial')
+          AND cycle_ts < (SELECT cycle_ts FROM latest)
+        ORDER BY cycle_ts DESC
+        LIMIT 1
       )
       SELECT
         l.cycle_ts,
@@ -108,11 +122,16 @@ async function loadLatestBoard(): Promise<BoardSnapshot> {
         m.long_n,
         m.short_n,
         m.median_leverage,
-        m.rank
+        m.rank,
+        p.rank AS prev_rank
       FROM latest l
       LEFT JOIN meta_index m
         ON m.cycle_ts = l.cycle_ts
        AND m.venue = ${VENUE}
+      LEFT JOIN meta_index p
+        ON p.cycle_ts = (SELECT cycle_ts FROM prev_cycle)
+       AND p.venue = ${VENUE}
+       AND p.coin = m.coin
       ORDER BY m.rank ASC NULLS LAST
     `) as RunRow[];
 

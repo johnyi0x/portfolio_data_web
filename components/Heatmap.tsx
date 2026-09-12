@@ -47,11 +47,12 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
   }, []);
 
   const rects = useMemo(() => {
+    const markBand = size.w > 0 && size.w < 720 ? 36 : 0;
     return squarify(
       rows.map((row) => ({ id: row.coin, value: row.holdPct })),
       size.w,
-      size.h,
-    );
+      Math.max(0, size.h - markBand),
+    ).map((rect) => ({ ...rect, y: rect.y + markBand }));
   }, [rows, size.h, size.w]);
 
   const byCoin = useMemo(() => {

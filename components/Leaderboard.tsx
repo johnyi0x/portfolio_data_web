@@ -5,8 +5,18 @@ import type { PairRow } from "@/lib/board";
 
 const PAGE_SIZE = 20;
 
-function pct(n: number): string {
-  return `${(n * 100).toFixed(1)}%`;
+function RankMove({ delta }: { delta: number | null }) {
+  if (delta == null || delta === 0) return null;
+  const up = delta > 0;
+  return (
+    <span
+      className={up ? "rank-move up" : "rank-move down"}
+      title={up ? `Up ${delta}` : `Down ${Math.abs(delta)}`}
+    >
+      <span aria-hidden="true">{up ? "▲" : "▼"}</span>
+      {Math.abs(delta)}
+    </span>
+  );
 }
 
 export function Leaderboard({ rows }: { rows: PairRow[] }) {
@@ -47,6 +57,7 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
                 <span className="pair">
                   {row.label}
                   {row.dex ? <span className="dex">{row.dex}</span> : null}
+                  <RankMove delta={row.rankDelta} />
                 </span>
               </td>
               <td>
