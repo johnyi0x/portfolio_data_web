@@ -55,7 +55,7 @@ export function SiteHeader() {
     >
       <nav className="menu-panel" aria-label="Site">
         <a className="menu-link current" href="/">
-          Board
+          hyperliquid board
         </a>
         <div className="menu-item">
           <p className="menu-item-label">Appearance</p>
@@ -82,7 +82,7 @@ export function SiteHeader() {
       <div className="site-header-bar" aria-hidden="true" />
       <div className="site-header-inner">
         <a className="brand" href="/">
-          bagindex
+          bagrank
         </a>
         <div className={`menu-wrap${open ? " open" : ""}`} ref={wrapRef}>
           <button

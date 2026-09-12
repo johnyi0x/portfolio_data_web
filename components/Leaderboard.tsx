@@ -28,7 +28,7 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
       <table>
         <thead>
           <tr>
-            <th className="num">#</th>
+            <th className="num">rank#</th>
             <th>Pair</th>
             <th>Side</th>
             <th className="num">Hold</th>

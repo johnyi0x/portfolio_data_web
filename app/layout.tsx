@@ -17,7 +17,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "bagindex",
+  title: "bagrank",
   description: "Majority holdings of top Hyperliquid wallets",
 };
 

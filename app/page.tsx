@@ -15,7 +15,7 @@ export default async function HomePage() {
     <main className="page">
       <section className="intro">
         <h1 className="intro-title">
-          Top {n} Hyperliquid wallets by {board.rankWindow} BagIndex Heatmap.
+          Top {n} Hyperliquid wallets by {board.rankWindow} BagRank Heatmap.
         </h1>
         <p className="intro-copy">
           Each of the {n} wallets gets one vote per pair they hold. The tile
@@ -45,7 +45,7 @@ export default async function HomePage() {
 
       <section className="glass panel">
         <div className="panel-head">
-          <h2>hyperliquid {n} bagindex heatmap</h2>
+          <h2>hyperliquid {n} bagrank heatmap</h2>
           <RefreshMark capturedAt={board.capturedAt} />
         </div>
         {board.rows.length ? (
@@ -61,7 +61,7 @@ export default async function HomePage() {
 
       <section className="glass panel">
         <div className="panel-head">
-          <h2>hyperliquid {n} bagindex leaderboard</h2>
+          <h2>hyperliquid {n} bagrank leaderboard</h2>
         </div>
         {board.rows.length ? (
           <Leaderboard rows={board.rows} />
