@@ -45,8 +45,8 @@ export default async function HomePage() {
 
       <section className="glass panel">
         <div className="panel-head">
-          <h2>Hold map</h2>
-          <RefreshMark />
+          <h2>hyperliquid {n} bagindex heatmap</h2>
+          <RefreshMark capturedAt={board.capturedAt} />
         </div>
         {board.rows.length ? (
           <Heatmap rows={board.rows} />
@@ -61,10 +61,7 @@ export default async function HomePage() {
 
       <section className="glass panel">
         <div className="panel-head">
-          <h2>Portfolio leaderboard</h2>
-          <span className="kicker" style={{ margin: 0 }}>
-            pair rank
-          </span>
+          <h2>hyperliquid {n} bagindex leaderboard</h2>
         </div>
         {board.rows.length ? (
           <Leaderboard rows={board.rows} />

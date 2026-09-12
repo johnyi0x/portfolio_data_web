@@ -1,10 +1,28 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { PairRow } from "@/lib/board";
+
+const PAGE_SIZE = 20;
 
 function pct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
 }
 
 export function Leaderboard({ rows }: { rows: PairRow[] }) {
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
+
+  const safePage = Math.min(page, pageCount - 1);
+  const start = safePage * PAGE_SIZE;
+  const slice = rows.slice(start, start + PAGE_SIZE);
+  const from = rows.length ? start + 1 : 0;
+  const to = Math.min(rows.length, start + slice.length);
+
   return (
     <div className="table-shell">
       <table>
@@ -22,7 +40,7 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {slice.map((row) => (
             <tr key={row.coin}>
               <td className="num muted">{String(row.rank).padStart(2, "0")}</td>
               <td>
@@ -50,6 +68,27 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
           ))}
         </tbody>
       </table>
+      {rows.length > PAGE_SIZE ? (
+        <nav className="pager" aria-label="Leaderboard pages">
+          <button
+            type="button"
+            disabled={safePage <= 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+          >
+            Prev
+          </button>
+          <span>
+            {from}–{to} of {rows.length}
+          </span>
+          <button
+            type="button"
+            disabled={safePage >= pageCount - 1}
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+          >
+            Next
+          </button>
+        </nav>
+      ) : null}
     </div>
   );
 }
