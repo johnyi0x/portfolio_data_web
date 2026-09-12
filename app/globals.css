@@ -611,6 +611,21 @@ th {
   margin-bottom: 0;
 }
 
+.about-panel ul {
+  margin: 0 0 12px;
+  padding-left: 18px;
+}
+
+.about-panel li {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.about-panel li:last-child {
+  margin-bottom: 0;
+}
+
 .about-panel a {
   color: var(--ink);
 }
@@ -629,8 +644,8 @@ th {
   }
 
   .heat-mark {
-    top: 8px;
-    right: 10px;
-    font-size: 18px;
+    top: 6px;
+    right: 8px;
+    font-size: 17px;
   }
 }

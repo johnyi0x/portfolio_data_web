@@ -10,11 +10,30 @@ function tileFill(row: PairRow): string {
   return `rgba(255, 69, 58, ${a})`;
 }
 
-function tileType(width: number, height: number, label: string, dex: string) {
+function markBox(width: number) {
+  const w = Math.min(170, Math.max(108, width * 0.4));
+  const h = width < 720 ? 26 : 30;
+  return { x: Math.max(0, width - w - 10), y: 5, w, h };
+}
+
+function overlapTop(rect: { x: number; y: number; w: number; h: number }, box: ReturnType<typeof markBox>) {
+  const ox = Math.min(rect.x + rect.w, box.x + box.w) - Math.max(rect.x, box.x);
+  const oy = Math.min(rect.y + rect.h, box.y + box.h) - Math.max(rect.y, box.y);
+  if (ox <= 0 || oy <= 0) return 0;
+  return Math.ceil(oy + 6);
+}
+
+function tileType(
+  width: number,
+  height: number,
+  label: string,
+  dex: string,
+  extraTop: number,
+) {
   const padX = Math.max(3, Math.min(10, width * 0.07));
   const padY = Math.max(2, Math.min(8, height * 0.08));
   const innerW = Math.max(8, width - padX * 2);
-  const innerH = Math.max(8, height - padY * 2);
+  const innerH = Math.max(8, height - padY * 2 - extraTop);
   const extra = dex ? dex.length * 0.55 + 1.2 : 0;
   const chars = Math.max(2, label.length + extra);
   const pair = Math.max(
@@ -47,17 +66,18 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
   }, []);
 
   const rects = useMemo(() => {
-    const markBand = size.w > 0 && size.w < 720 ? 36 : 0;
     return squarify(
       rows.map((row) => ({ id: row.coin, value: row.holdPct })),
       size.w,
-      Math.max(0, size.h - markBand),
-    ).map((rect) => ({ ...rect, y: rect.y + markBand }));
+      size.h,
+    );
   }, [rows, size.h, size.w]);
 
   const byCoin = useMemo(() => {
     return new Map(rows.map((row) => [row.coin, row]));
   }, [rows]);
+
+  const mark = markBox(size.w);
 
   return (
     <div
@@ -69,7 +89,8 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
       {rects.map((rect) => {
         const row = byCoin.get(rect.id);
         if (!row || rect.w < 2 || rect.h < 2) return null;
-        const type = tileType(rect.w, rect.h, row.label, row.dex);
+        const extraTop = overlapTop(rect, mark);
+        const type = tileType(rect.w, rect.h, row.label, row.dex, extraTop);
         return (
           <div
             key={row.coin}
@@ -79,7 +100,7 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
               top: rect.y,
               width: rect.w,
               height: rect.h,
-              padding: `${type.padY}px ${type.padX}px`,
+              padding: `${type.padY + extraTop}px ${type.padX}px ${type.padY}px`,
               background: tileFill(row),
             }}
           >
