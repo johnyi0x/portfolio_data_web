@@ -104,7 +104,7 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
         );
       })}
       <span className="heat-mark" aria-hidden="true">
-        bagrank
+        bagrank.xyz
       </span>
     </div>
   );

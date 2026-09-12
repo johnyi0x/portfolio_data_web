@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
 import { Providers } from "./providers";
@@ -17,8 +19,12 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "bagrank",
-  description: "Majority holdings of top Hyperliquid wallets",
+  metadataBase: new URL("https://bagrank.xyz"),
+  title: {
+    default: "bagrank",
+    template: "%s · bagrank",
+  },
+  description: "Crowd hold map of top Hyperliquid wallets",
 };
 
 export default function RootLayout({
@@ -33,9 +39,12 @@ export default function RootLayout({
           {THEME_BOOT_SCRIPT}
         </Script>
         <Providers>
-          <SiteHeader />
+          <Suspense fallback={null}>
+            <SiteHeader />
+          </Suspense>
           {children}
         </Providers>
+        <Analytics />
       </body>
     </html>
   );

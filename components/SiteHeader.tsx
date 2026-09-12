@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { useTheme, type ColorMode } from "@/lib/theme";
 
 const MODES: { id: ColorMode; label: string }[] = [
@@ -10,8 +11,20 @@ const MODES: { id: ColorMode; label: string }[] = [
   { id: "dark", label: "Dark" },
 ];
 
+function XMark() {
+  return (
+    <svg className="menu-x" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M14.1 10.3 22.2 1h-2.3l-6.9 8-5.5-8H1.2l8.5 12.3L1.2 23h2.3l7.4-8.6L16.8 23h6.3l-9-12.7ZM5 2.6h3.5l10.4 18.8h-3.5L5 2.6Z"
+      />
+    </svg>
+  );
+}
+
 export function SiteHeader() {
   const menuId = useId();
+  const pathname = usePathname();
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -21,6 +34,10 @@ export function SiteHeader() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,8 +71,26 @@ export function SiteHeader() {
       aria-hidden={!open}
     >
       <nav className="menu-panel" aria-label="Site">
-        <a className="menu-link current" href="/">
+        <a
+          className={`menu-link${pathname === "/" ? " current" : ""}`}
+          href="/"
+        >
           hyperliquid board
+        </a>
+        <a
+          className={`menu-link${pathname === "/about" ? " current" : ""}`}
+          href="/about"
+        >
+          about
+        </a>
+        <a
+          className="menu-link menu-social"
+          href="https://x.com/JohnYi0x"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <XMark />
+          JohnYi0x
         </a>
         <div className="menu-item">
           <p className="menu-item-label">Appearance</p>
