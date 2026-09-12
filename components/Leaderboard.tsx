@@ -19,6 +19,10 @@ function RankMove({ delta }: { delta: number | null }) {
   );
 }
 
+function pct(n: number): string {
+  return `${(n * 100).toFixed(1)}%`;
+}
+
 export function Leaderboard({ rows }: { rows: PairRow[] }) {
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
