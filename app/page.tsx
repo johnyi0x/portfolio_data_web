@@ -21,7 +21,9 @@ export default async function HomePage() {
           Each of the {n} wallets gets one vote per pair they hold. The tile
           is how many of those wallets are in that pair (majority side).
           Biggest tile = most of the top {n} are in it. Crowd hold map, not
-          average rank inside each book. Green is long, red is short.
+          average rank inside each book. Green is long, red is short. Native
+          and HIP-3 builder perps (xyz, io, and others) count the same; the
+          badge is the dex.
         </p>
         <div className="meta">
           <span>

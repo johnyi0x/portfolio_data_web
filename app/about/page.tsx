@@ -50,6 +50,12 @@ export default function AboutPage() {
           a Nasdaq-style index. Each hour also stores that pair’s mark and
           1h candle so later hours are not a board without a price.
         </p>
+        <p>
+          Native perps and HIP-3 builder perps count the same. That includes
+          xyz, io, and any other live builder dex those wallets are in. The
+          small badge on the name is the dex. A builder pair only appears if
+          someone in that hour’s 200 actually holds it.
+        </p>
       </section>
 
       <section className="glass panel about-panel">
