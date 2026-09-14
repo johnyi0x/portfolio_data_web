@@ -295,7 +295,7 @@ export const getLatestBoard = unstable_cache(loadLatestBoard, ["board", VENUE], 
   tags: ["board"],
 });
 
-const RANK_CAP = 10;
+const RANK_CAP = 5;
 
 export type RankHistoryPoint = {
   ts: number;
@@ -349,7 +349,7 @@ async function loadRankHistory(): Promise<RankHistory> {
         FROM meta_index
         WHERE venue = ${VENUE}
           AND cycle_ts = (SELECT cycle_ts FROM latest)
-          AND rank <= 10
+          AND rank <= 5
       )
       SELECT
         m.cycle_ts,
@@ -409,7 +409,11 @@ async function loadRankHistory(): Promise<RankHistory> {
         points: ordered,
       });
     }
-    series.sort((a, b) => a.latestRank - b.latestRank);
+    series.sort((a, b) => {
+      const ah = a.points[a.points.length - 1]?.holdPct ?? 0;
+      const bh = b.points[b.points.length - 1]?.holdPct ?? 0;
+      return bh - ah;
+    });
     return { hours, series };
   } catch {
     return { hours: [], series: [] };

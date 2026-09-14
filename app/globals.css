@@ -432,9 +432,15 @@ body {
   color: var(--muted);
 }
 
+.rank-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .rank-chart {
   position: relative;
-  height: 320px;
+  height: 240px;
   border-radius: 14px;
   overflow: hidden;
   background: var(--well);
@@ -450,8 +456,9 @@ body {
 
 .rank-grid {
   stroke: var(--line);
-  stroke-dasharray: 3 7;
+  stroke-dasharray: 0;
   stroke-width: 1;
+  stroke-opacity: 0.7;
 }
 
 .rank-axis {
@@ -463,123 +470,168 @@ body {
 
 .rank-cross {
   stroke: var(--ink);
-  stroke-opacity: 0.32;
+  stroke-opacity: 0.22;
   stroke-width: 1;
 }
 
-.rank-end {
-  font-size: 11px;
-  font-weight: 650;
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+.rank-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
-.rank-pulse,
-.rank-hot {
-  opacity: 0.28;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: rank-glow 2.4s ease-in-out infinite;
-}
-
-.rank-hot {
-  animation-duration: 1.5s;
-}
-
-@keyframes rank-glow {
-  0%,
-  100% {
-    opacity: 0.16;
-    transform: scale(0.82);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.18);
-  }
-}
-
-.rank-tip {
-  position: absolute;
-  top: 14px;
-  z-index: 4;
-  pointer-events: none;
-  min-width: 210px;
-  max-width: 280px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  color: var(--ink);
-  background: var(--menu);
-  border: 1px solid var(--line);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
-}
-
-.rank-tip-time {
-  margin: 0 0 8px;
+.rank-legend-time {
+  margin: 0;
+  width: 100%;
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 10px;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.rank-tip ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.rank-tip li {
-  display: flex;
+.rank-legend button {
+  display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  margin: 0 0 4px;
-  font-size: 11px;
-  line-height: 1.35;
-  font-variant-numeric: tabular-nums;
-}
-
-.rank-tip li:last-child {
   margin: 0;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  cursor: pointer;
 }
 
-.rank-tip i {
+.rank-legend button i {
   width: 7px;
   height: 7px;
   border-radius: 99px;
+  background: var(--swatch);
   flex: 0 0 auto;
+  align-self: center;
 }
 
-.rank-tip b {
+.rank-legend button b {
   font-weight: 650;
 }
 
-.rank-tip em {
+.rank-legend button .rank-leg-pct {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.rank-legend button .long,
+.rank-legend button .short {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rank-legend button .long {
+  color: var(--long);
+}
+
+.rank-legend button .short {
+  color: var(--short);
+}
+
+.rank-legend button em {
   font-style: normal;
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 
-.rank-tip .long {
+.rank-legend button em.up {
   color: var(--long);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
 }
 
-.rank-tip .short {
+.rank-legend button em.down {
   color: var(--short);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rank-pulse,
-  .rank-hot {
-    animation: none;
-    opacity: 0.3;
+.rank-legend button.on {
+  background: var(--well);
+  border-color: color-mix(in srgb, var(--swatch) 55%, var(--line));
+}
+
+@media (max-width: 759px) {
+  .rank-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .rank-legend-time {
+    grid-column: 1 / -1;
+  }
+
+  .rank-legend button {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: 7px;
+    row-gap: 1px;
+    align-items: center;
+    width: 100%;
+    padding: 8px 9px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+
+  .rank-legend button i {
+    grid-row: 1 / span 2;
+  }
+
+  .rank-legend button b {
+    grid-column: 2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rank-legend button .rank-leg-pct {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .rank-legend button .long,
+  .rank-legend button .short {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .rank-legend button em {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+  }
+
+  .rank-legend button.on {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 760px) {
+  .rank-legend-time {
+    width: auto;
+    margin-right: 4px;
+  }
+
+  .rank-chart {
+    height: 268px;
   }
 }
 
@@ -856,6 +908,6 @@ th {
   }
 
   .rank-chart {
-    height: 280px;
+    height: 220px;
   }
 }

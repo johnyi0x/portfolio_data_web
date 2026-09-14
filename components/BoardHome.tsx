@@ -75,14 +75,14 @@ export async function BoardHome() {
 
       <section className="glass panel" id="ranks">
         <div className="panel-head">
-          <h2>hyperliquid top 10 rank · last 24h</h2>
+          <h2>crowd hold · last 24h</h2>
         </div>
         {rankHistory.series.length ? (
           <RankChart history={rankHistory} />
         ) : (
           <div className="rank-chart empty-panel">
             <p>
-              {board.error ?? "Need a few hourly snapshots to draw 24h ranks."}
+              {board.error ?? "Need a few hourly snapshots to draw 24h holds."}
             </p>
           </div>
         )}
