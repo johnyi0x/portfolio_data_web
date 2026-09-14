@@ -1,12 +1,16 @@
 import { Heatmap } from "@/components/Heatmap";
 import { Leaderboard } from "@/components/Leaderboard";
+import { RankChart } from "@/components/RankChart";
 import { RefreshMark } from "@/components/RefreshMark";
 import { ShareOnX } from "@/components/ShareOnX";
-import { getLatestBoard } from "@/lib/board-data";
+import { getLatestBoard, getRankHistory } from "@/lib/board-data";
 import { heatmapShareUrl, heatmapTweetText } from "@/lib/share";
 
 export async function BoardHome() {
-  const board = await getLatestBoard();
+  const [board, rankHistory] = await Promise.all([
+    getLatestBoard(),
+    getRankHistory(),
+  ]);
   const longs = board.rows.filter((r) => r.side === "long").length;
   const shorts = board.rows.length - longs;
   const n = board.listed;
@@ -64,6 +68,21 @@ export async function BoardHome() {
           <div className="heatmap empty-panel">
             <p>
               {board.error ?? "Waiting for the first Neon snapshot."}
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="glass panel" id="ranks">
+        <div className="panel-head">
+          <h2>hyperliquid top 10 rank · last 24h</h2>
+        </div>
+        {rankHistory.series.length ? (
+          <RankChart history={rankHistory} />
+        ) : (
+          <div className="rank-chart empty-panel">
+            <p>
+              {board.error ?? "Need a few hourly snapshots to draw 24h ranks."}
             </p>
           </div>
         )}

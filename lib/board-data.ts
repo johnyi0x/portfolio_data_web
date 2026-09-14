@@ -294,3 +294,129 @@ export const getLatestBoard = unstable_cache(loadLatestBoard, ["board", VENUE], 
   revalidate: 60,
   tags: ["board"],
 });
+
+const RANK_CAP = 10;
+
+export type RankHistoryPoint = {
+  ts: number;
+  stamp: string;
+  rank: number;
+  side: Side;
+  holdPct: number;
+  wallets: number;
+};
+
+export type RankHistorySeries = {
+  coin: string;
+  label: string;
+  dex: string;
+  latestRank: number;
+  points: RankHistoryPoint[];
+};
+
+export type RankHistory = {
+  hours: { ts: number; stamp: string }[];
+  series: RankHistorySeries[];
+};
+
+type HistRow = {
+  cycle_ts: Date | string;
+  coin: string;
+  side: string;
+  rank: number | string;
+  hold_pct: number | string;
+  wallets: number | string;
+};
+
+async function loadRankHistory(): Promise<RankHistory> {
+  const sql = getSql();
+  if (!sql) return { hours: [], series: [] };
+  try {
+    const rows = (await sql`
+      WITH hours AS (
+        SELECT cycle_ts
+        FROM collector_runs
+        WHERE venue = ${VENUE}
+          AND status IN ('ok', 'partial')
+        ORDER BY cycle_ts DESC
+        LIMIT 24
+      ),
+      latest AS (
+        SELECT MAX(cycle_ts) AS cycle_ts FROM hours
+      ),
+      top AS (
+        SELECT coin
+        FROM meta_index
+        WHERE venue = ${VENUE}
+          AND cycle_ts = (SELECT cycle_ts FROM latest)
+          AND rank <= 10
+      )
+      SELECT
+        m.cycle_ts,
+        m.coin,
+        m.side,
+        m.rank,
+        m.hold_pct,
+        m.wallets
+      FROM meta_index m
+      INNER JOIN hours h ON h.cycle_ts = m.cycle_ts
+      INNER JOIN top t ON t.coin = m.coin
+      WHERE m.venue = ${VENUE}
+      ORDER BY m.cycle_ts ASC, m.rank ASC
+    `) as HistRow[];
+
+    const hourMap = new Map<number, { ts: number; stamp: string }>();
+    const byCoin = new Map<string, RankHistoryPoint[]>();
+    for (const row of rows) {
+      const stamp = formatUtcStamp(row.cycle_ts);
+      if (!stamp) continue;
+      const ts = new Date(row.cycle_ts).getTime();
+      if (!Number.isFinite(ts)) continue;
+      hourMap.set(ts, { ts, stamp });
+      const coin = String(row.coin || "");
+      if (!coin) continue;
+      const list = byCoin.get(coin) || [];
+      list.push({
+        ts,
+        stamp,
+        rank: Math.max(1, Math.round(num(row.rank, 99))),
+        side: row.side === "short" ? "short" : "long",
+        holdPct: num(row.hold_pct),
+        wallets: Math.round(num(row.wallets)),
+      });
+      byCoin.set(coin, list);
+    }
+
+    const hours = [...hourMap.values()].sort((a, b) => a.ts - b.ts);
+    const lastTs = hours.length ? hours[hours.length - 1].ts : 0;
+    const series: RankHistorySeries[] = [];
+    for (const [coin, points] of byCoin) {
+      const ordered = [...points].sort((a, b) => a.ts - b.ts);
+      let last = ordered[ordered.length - 1];
+      for (let i = ordered.length - 1; i >= 0; i--) {
+        if (ordered[i].ts === lastTs) {
+          last = ordered[i];
+          break;
+        }
+      }
+      if (!last || last.rank > RANK_CAP) continue;
+      const { label, dex } = splitCoin(coin);
+      series.push({
+        coin,
+        label,
+        dex,
+        latestRank: last.rank,
+        points: ordered,
+      });
+    }
+    series.sort((a, b) => a.latestRank - b.latestRank);
+    return { hours, series };
+  } catch {
+    return { hours: [], series: [] };
+  }
+}
+
+export const getRankHistory = unstable_cache(loadRankHistory, ["rank-history", VENUE], {
+  revalidate: 60,
+  tags: ["board"],
+});
