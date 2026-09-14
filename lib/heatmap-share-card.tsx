@@ -7,11 +7,13 @@ import {
 } from "@/lib/heatmap-layout";
 import { squarify } from "@/lib/squarify";
 
-export const HEATMAP_OG_SIZE = 1200;
+/** X summary_large_image slot. Square cards get center-cropped. */
+export const HEATMAP_OG_WIDTH = 1200;
+export const HEATMAP_OG_HEIGHT = 628;
 
-const PAD = 32;
-const HEADER_H = 52;
-const HEADER_GAP = 14;
+const PAD = 22;
+const HEADER_H = 40;
+const HEADER_GAP = 8;
 const INK = "#f5f5f7";
 const MUTED = "rgba(245, 245, 247, 0.52)";
 const LINE = "rgba(255, 255, 255, 0.12)";
@@ -23,8 +25,8 @@ function holdPct(row: PairRow): string {
 }
 
 export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
-  const mapW = HEATMAP_OG_SIZE - PAD * 2;
-  const mapH = HEATMAP_OG_SIZE - PAD - HEADER_H - HEADER_GAP - PAD;
+  const mapW = HEATMAP_OG_WIDTH - PAD * 2;
+  const mapH = HEATMAP_OG_HEIGHT - PAD - HEADER_H - HEADER_GAP - PAD;
   const scale = mapH / 560;
   const mark = markBox(mapW);
   const listed = board.listed || 200;
@@ -53,8 +55,8 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
   return (
     <div
       style={{
-        width: HEATMAP_OG_SIZE,
-        height: HEATMAP_OG_SIZE,
+        width: HEATMAP_OG_WIDTH,
+        height: HEATMAP_OG_HEIGHT,
         display: "flex",
         flexDirection: "column",
         background: PANEL,
@@ -74,9 +76,9 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
         <div
           style={{
             display: "flex",
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: 600,
-            letterSpacing: 1.4,
+            letterSpacing: 1.2,
             textTransform: "uppercase",
             color: MUTED,
           }}
@@ -87,8 +89,8 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
           style={{
             display: "flex",
             alignItems: "center",
-            fontSize: 15,
-            letterSpacing: 0.7,
+            fontSize: 13,
+            letterSpacing: 0.6,
             textTransform: "uppercase",
             color: MUTED,
           }}
@@ -96,8 +98,8 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
           REFRESH EVERY 1H
           <div
             style={{
-              width: 9,
-              height: 9,
+              width: 8,
+              height: 8,
               marginLeft: 8,
               marginRight: 8,
               border: "2px solid rgba(245,245,247,0.28)",
@@ -115,7 +117,7 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
           display: "flex",
           position: "relative",
           overflow: "hidden",
-          borderRadius: 18,
+          borderRadius: 14,
           background: WELL,
         }}
       >
@@ -128,7 +130,7 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
               alignItems: "center",
               justifyContent: "center",
               color: MUTED,
-              fontSize: 28,
+              fontSize: 22,
             }}
           >
             {board.error ?? "Waiting for the first snapshot."}
@@ -213,12 +215,12 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
         <div
           style={{
             position: "absolute",
-            top: 10,
-            right: 16,
+            top: 8,
+            right: 14,
             display: "flex",
-            fontSize: 34,
+            fontSize: 24,
             fontWeight: 700,
-            letterSpacing: -1,
+            letterSpacing: -0.8,
             color: INK,
             opacity: 0.26,
           }}

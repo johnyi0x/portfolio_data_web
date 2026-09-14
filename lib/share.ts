@@ -1,4 +1,6 @@
-import type { PairRow } from "@/lib/board";
+import type { Metadata } from "next";
+import type { BoardSnapshot, PairRow } from "@/lib/board";
+import { HEATMAP_OG_HEIGHT, HEATMAP_OG_WIDTH } from "@/lib/heatmap-share-card";
 
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://bagrank.xyz";
@@ -39,4 +41,39 @@ export function heatmapTweetText(row: PairRow | undefined, listed: number): stri
 export function xIntentUrl(text: string, url: string): string {
   const q = new URLSearchParams({ text, url });
   return `https://x.com/intent/tweet?${q.toString()}`;
+}
+
+export function heatmapCardMetadata(
+  board: BoardSnapshot,
+  opts: { url: string; title: string; noIndex?: boolean },
+): Metadata {
+  const og = heatmapOgPath(board.cycleTs);
+  const top = board.rows[0];
+  const description = heatmapTweetText(top, board.listed).replace(/\n/g, " ");
+  return {
+    title: opts.title,
+    description,
+    robots: opts.noIndex ? { index: false, follow: true } : undefined,
+    openGraph: {
+      title: "bagrank heatmap",
+      description,
+      url: opts.url,
+      type: "website",
+      images: [
+        {
+          url: og,
+          width: HEATMAP_OG_WIDTH,
+          height: HEATMAP_OG_HEIGHT,
+          type: "image/png",
+          alt: "Hyperliquid bagrank heatmap",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "bagrank heatmap",
+      description,
+      images: [og],
+    },
+  };
 }
