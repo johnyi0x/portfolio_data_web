@@ -166,32 +166,20 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
                   style={{
                     display: "flex",
                     alignItems: "baseline",
-                    maxWidth: "100%",
                     fontSize: type.pair,
                     fontWeight: 700,
                     letterSpacing: -0.4,
-                    lineHeight: 1.08,
+                    lineHeight: 1.1,
                     whiteSpace: "nowrap",
-                    overflow: "hidden",
                   }}
                 >
-                  <div
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      minWidth: 0,
-                    }}
-                  >
-                    {row.label}
-                  </div>
+                  {row.label}
                   {type.showDex && row.dex ? (
                     <div
                       style={{
                         display: "flex",
-                        flexShrink: 0,
                         marginLeft: 6,
-                        fontSize: Math.max(5, type.pair * 0.58),
+                        fontSize: Math.max(6, type.pair * 0.55),
                         letterSpacing: 1,
                         textTransform: "uppercase",
                         color: MUTED,
@@ -205,14 +193,11 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
               {type.showMeta ? (
                 <div
                   style={{
-                    display: "block",
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    display: "flex",
                     fontSize: type.meta,
                     opacity: 0.9,
-                    lineHeight: 1.08,
+                    lineHeight: 1.1,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   {row.side.toUpperCase()} {holdPct(row)}
@@ -221,18 +206,17 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
               {type.showSub ? (
                 <div
                   style={{
-                    display: "block",
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    display: "flex",
                     fontSize: type.sub,
                     color: MUTED,
-                    lineHeight: 1.08,
+                    lineHeight: 1.1,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   {row.wallets}/{row.onCoin} · agr {Math.round(row.agreement * 100)}%
-                  {row.price ? ` · ${formatPxCompact(row.price)}` : ""} · {row.leverage}x
+                  {type.subLevel >= 2
+                    ? `${row.price ? ` · ${formatPxCompact(row.price)}` : ""} · ${row.leverage}x`
+                    : ""}
                 </div>
               ) : null}
             </div>
