@@ -1,5 +1,13 @@
 import type { PairRow } from "@/lib/board";
 
+/** Approx glyph width / font-size for bold ticker text. */
+const LABEL_EM = 0.64;
+/** Dex badge is smaller + mono + letter-spacing. */
+const DEX_EM = 0.78;
+const LINE = 1.08;
+const GAP = 1.5;
+const BORDER = 2; // 1px each side on .heat-cell
+
 export function tileFill(row: PairRow): string {
   const a = 0.18 + row.agreement * 0.42;
   if (row.side === "long") return `rgba(48, 209, 141, ${a})`;
@@ -22,6 +30,34 @@ export function overlapTop(
   return Math.ceil(oy + 6);
 }
 
+export type TileType = {
+  padX: number;
+  padY: number;
+  pair: number;
+  meta: number;
+  sub: number;
+  showPair: boolean;
+  showMeta: boolean;
+  showSub: boolean;
+  showDex: boolean;
+};
+
+function pairWidth(font: number, label: string, dex: string, withDex: boolean): number {
+  const labelW = Math.max(1, label.length) * font * LABEL_EM;
+  if (!withDex || !dex) return labelW;
+  const dexFont = Math.max(5, font * 0.58);
+  const gap = font * 0.35;
+  return labelW + gap + dex.length * dexFont * DEX_EM;
+}
+
+function lineH(font: number): number {
+  return font * LINE;
+}
+
+/**
+ * Pick what fits inside a treemap cell without cropping.
+ * Prefer dropping dex → sub → meta → pair over clipping mid-glyph.
+ */
 export function tileType(
   width: number,
   height: number,
@@ -29,22 +65,101 @@ export function tileType(
   dex: string,
   extraTop: number,
   scale = 1,
-) {
+): TileType {
   const s = scale > 0 ? scale : 1;
-  const padX = Math.max(3 * s, Math.min(10 * s, width * 0.07));
-  const padY = Math.max(2 * s, Math.min(8 * s, height * 0.08));
-  const innerW = Math.max(8 * s, width - padX * 2);
-  const innerH = Math.max(8 * s, height - padY * 2 - extraTop);
-  const extra = dex ? dex.length * 0.55 + 1.2 : 0;
-  const chars = Math.max(2, label.length + extra);
-  const pair = Math.max(
-    5 * s,
-    Math.min(16 * s, innerW / (chars * 0.7), innerH * 0.5),
-  );
-  const meta = Math.max(6 * s, Math.min(11 * s, pair * 0.72));
-  const sub = Math.max(6 * s, Math.min(10 * s, pair * 0.64));
-  const showMeta = innerH >= pair * 1.2 + meta * 1.25 + 6 * s && width >= 52 * s;
-  const showSub =
-    showMeta && innerH >= pair * 1.2 + meta * 1.25 + sub * 1.25 + 10 * s && width >= 84 * s;
-  return { padX, padY, pair, meta, sub, showMeta, showSub };
+  const boxW = Math.max(0, width - BORDER);
+  const boxH = Math.max(0, height - BORDER);
+
+  const padX = Math.max(2 * s, Math.min(8 * s, boxW * 0.06));
+  const padY = Math.max(2 * s, Math.min(6 * s, boxH * 0.06));
+  const innerW = Math.max(0, boxW - padX * 2);
+  const innerH = Math.max(0, boxH - padY * 2 - extraTop);
+
+  const empty: TileType = {
+    padX,
+    padY,
+    pair: 0,
+    meta: 0,
+    sub: 0,
+    showPair: false,
+    showMeta: false,
+    showSub: false,
+    showDex: false,
+  };
+
+  if (innerW < 10 * s || innerH < 9 * s) return empty;
+
+  const minPair = 6 * s;
+  const maxPair = Math.min(16 * s, innerH * 0.72, innerW / 2.2);
+
+  const tryFit = (withMeta: boolean, withSub: boolean, withDex: boolean) => {
+    const metaBase = withMeta ? Math.min(11 * s, Math.max(6 * s, maxPair * 0.7)) : 0;
+    const subBase = withSub ? Math.min(10 * s, Math.max(6 * s, maxPair * 0.62)) : 0;
+    // Pair gets leftover height after reserved meta/sub (+ gaps).
+    const reserved =
+      (withMeta ? lineH(metaBase) + GAP * s : 0) +
+      (withSub ? lineH(subBase) + GAP * s : 0);
+    const pairBudgetH = Math.max(0, innerH - reserved);
+    if (pairBudgetH < minPair * LINE) return null;
+
+    let lo = minPair;
+    let hi = Math.min(maxPair, pairBudgetH / LINE);
+    let best = 0;
+    for (let i = 0; i < 14; i++) {
+      const mid = (lo + hi) / 2;
+      if (pairWidth(mid, label, dex, withDex) <= innerW && lineH(mid) <= pairBudgetH + 0.01) {
+        best = mid;
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    if (best < minPair - 0.01) return null;
+
+    const pair = Math.floor(best * 10) / 10;
+    const meta = withMeta
+      ? Math.min(metaBase, Math.max(6 * s, pair * 0.7), innerW / 7)
+      : 0;
+    const sub = withSub
+      ? Math.min(subBase, Math.max(6 * s, pair * 0.62), innerW / 9)
+      : 0;
+
+    const totalH =
+      lineH(pair) +
+      (withMeta ? GAP * s + lineH(meta) : 0) +
+      (withSub ? GAP * s + lineH(sub) : 0);
+    if (totalH > innerH + 0.5) return null;
+    if (withMeta && pairWidth(meta, "SHORT 99.9%", "", false) > innerW) return null;
+
+    return { pair, meta, sub, withDex };
+  };
+
+  // Richest layout first; degrade until something fits.
+  const attempts: [boolean, boolean, boolean][] = [
+    [true, true, Boolean(dex)],
+    [true, false, Boolean(dex)],
+    [true, true, false],
+    [true, false, false],
+    [false, false, Boolean(dex)],
+    [false, false, false],
+  ];
+
+  for (const [withMeta, withSub, withDex] of attempts) {
+    if (withSub && !withMeta) continue;
+    const fit = tryFit(withMeta, withSub, withDex);
+    if (!fit) continue;
+    return {
+      padX,
+      padY,
+      pair: fit.pair,
+      meta: fit.meta,
+      sub: fit.sub,
+      showPair: true,
+      showMeta: withMeta,
+      showSub: withSub,
+      showDex: withDex && Boolean(dex),
+    };
+  }
+
+  return empty;
 }

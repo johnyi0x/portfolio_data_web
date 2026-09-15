@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useMemo, useRef, useState } from "react";
 import { formatPxCompact, type PairRow } from "@/lib/board";
 import {
   markBox,
@@ -9,6 +9,73 @@ import {
   tileType,
 } from "@/lib/heatmap-layout";
 import { squarify } from "@/lib/squarify";
+
+/** After paint, shrink/hide lines that still overflow (font metrics vary by device). */
+function fitHeatCells(root: HTMLElement) {
+  const cells = root.querySelectorAll<HTMLElement>(".heat-cell");
+  cells.forEach((cell) => {
+    const pair = cell.querySelector<HTMLElement>(".heat-pair");
+    const meta = cell.querySelector<HTMLElement>(".heat-meta");
+    const sub = cell.querySelector<HTMLElement>(".heat-sub");
+    if (!pair) return;
+
+    const style = getComputedStyle(cell);
+    const padX =
+      (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    const padY =
+      (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    const availW = cell.clientWidth - padX;
+    const availH = cell.clientHeight - padY;
+    if (availW < 4 || availH < 4) {
+      pair.style.visibility = "hidden";
+      if (meta) meta.style.display = "none";
+      if (sub) sub.style.display = "none";
+      return;
+    }
+
+    pair.style.visibility = "visible";
+    if (meta) meta.style.display = "";
+    if (sub) sub.style.display = "";
+
+    const contentH = () => {
+      let h = pair.offsetHeight;
+      if (meta && meta.style.display !== "none") h += meta.offsetHeight + 1.5;
+      if (sub && sub.style.display !== "none") h += sub.offsetHeight + 1.5;
+      return h;
+    };
+
+    let size = parseFloat(pair.style.fontSize) || parseFloat(getComputedStyle(pair).fontSize);
+    const min = 5;
+    let guard = 0;
+    while (
+      guard++ < 40 &&
+      size > min &&
+      (pair.scrollWidth > availW + 0.5 || contentH() > availH + 0.5)
+    ) {
+      size -= 0.5;
+      pair.style.fontSize = `${size}px`;
+      const dex = pair.querySelector<HTMLElement>("em");
+      if (dex) dex.style.fontSize = `${Math.max(5, size * 0.58)}px`;
+    }
+
+    // Drop secondary lines before cropping the ticker.
+    if (sub && (pair.scrollWidth > availW + 0.5 || contentH() > availH + 0.5)) {
+      sub.style.display = "none";
+    }
+    if (meta && (pair.scrollWidth > availW + 0.5 || contentH() > availH + 0.5)) {
+      meta.style.display = "none";
+    }
+
+    // Last resort: hide dex badge, then ticker if still impossible.
+    const dex = pair.querySelector<HTMLElement>("em");
+    if (dex && pair.scrollWidth > availW + 0.5) {
+      dex.style.display = "none";
+    }
+    if (pair.scrollWidth > availW + 0.5 || contentH() > availH + 0.5) {
+      pair.style.visibility = "hidden";
+    }
+  });
+}
 
 export function Heatmap({ rows }: { rows: PairRow[] }) {
   const wrap = useRef<HTMLDivElement>(null);
@@ -41,6 +108,12 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
 
   const mark = markBox(size.w);
 
+  useLayoutEffect(() => {
+    const el = wrap.current;
+    if (!el || !size.w) return;
+    fitHeatCells(el);
+  }, [rects, size.w, size.h, rows]);
+
   return (
     <div
       ref={wrap}
@@ -53,10 +126,16 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
         if (!row || rect.w < 2 || rect.h < 2) return null;
         const extraTop = overlapTop(rect, mark);
         const type = tileType(rect.w, rect.h, row.label, row.dex, extraTop);
+        const tip = [
+          row.dex ? `${row.label} (${row.dex})` : row.label,
+          `${row.side} ${Math.round(row.holdPct * 1000) / 10}%`,
+          `${row.wallets}/${row.onCoin} · agr ${Math.round(row.agreement * 100)}%`,
+        ].join(" · ");
         return (
           <div
             key={row.coin}
             className="heat-cell"
+            title={tip}
             style={{
               left: rect.x,
               top: rect.y,
@@ -66,14 +145,16 @@ export function Heatmap({ rows }: { rows: PairRow[] }) {
               background: tileFill(row),
             }}
           >
-            <span className="heat-pair" style={{ fontSize: `${type.pair}px` }}>
-              {row.label}
-              {row.dex ? (
-                <em style={{ fontSize: `${Math.max(5, type.pair * 0.58)}px` }}>
-                  {row.dex}
-                </em>
-              ) : null}
-            </span>
+            {type.showPair ? (
+              <span className="heat-pair" style={{ fontSize: `${type.pair}px` }}>
+                <span className="heat-label">{row.label}</span>
+                {type.showDex && row.dex ? (
+                  <em style={{ fontSize: `${Math.max(5, type.pair * 0.58)}px` }}>
+                    {row.dex}
+                  </em>
+                ) : null}
+              </span>
+            ) : null}
             {type.showMeta ? (
               <span className="heat-meta" style={{ fontSize: `${type.meta}px` }}>
                 {row.side.toUpperCase()} {Math.round(row.holdPct * 1000) / 10}%

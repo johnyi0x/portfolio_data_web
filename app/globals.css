@@ -429,21 +429,31 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 1px;
+  gap: 1.5px;
   border: 1px solid var(--tile-line);
   box-shadow: inset 0 1px 0 var(--inset);
+  box-sizing: border-box;
 }
 
 .heat-pair {
   font-weight: 650;
   letter-spacing: -0.03em;
-  line-height: 1.05;
+  line-height: 1.08;
   display: flex;
   flex-wrap: nowrap;
   align-items: baseline;
   gap: 0.35em;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.heat-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -454,6 +464,21 @@ body {
   text-transform: uppercase;
   color: var(--muted);
   flex: 0 0 auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heat-meta,
+.heat-sub {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.08;
 }
 
 .heat-meta {
