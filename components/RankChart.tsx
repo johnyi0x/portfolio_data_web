@@ -174,7 +174,7 @@ export function RankChart({ history }: { history: RankHistory }) {
   if (!hours.length || !history.series.length) {
     return (
       <div className="rank-chart empty-panel">
-        <p>Need a few hourly snapshots to draw 24h holds.</p>
+        <p>Need at least one hourly snapshot to draw holds.</p>
       </div>
     );
   }
@@ -225,7 +225,7 @@ export function RankChart({ history }: { history: RankHistory }) {
               {live ? <span className={live.side}>{live.side}</span> : null}
               {delta ? (
                 <em
-                  title="24h change in hold %"
+                  title="Change in hold % over the chart window"
                   className={deltaN > 0.0005 ? "up" : deltaN < -0.0005 ? "down" : undefined}
                 >
                   {delta}

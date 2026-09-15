@@ -1,24 +1,39 @@
+import { Suspense } from "react";
 import { Heatmap } from "@/components/Heatmap";
 import { Leaderboard } from "@/components/Leaderboard";
 import { RankChart } from "@/components/RankChart";
+import { RankerSwitch } from "@/components/RankerSwitch";
 import { RefreshMark } from "@/components/RefreshMark";
 import { ShareOnX } from "@/components/ShareOnX";
 import { getLatestBoard, getRankHistory } from "@/lib/board-data";
+import { rankerLabel, type Ranker } from "@/lib/ranker";
 import { heatmapShareUrl, heatmapTweetText } from "@/lib/share";
 
-export async function BoardHome() {
+export async function BoardHome({ ranker }: { ranker: Ranker }) {
   const [board, rankHistory] = await Promise.all([
-    getLatestBoard(),
-    getRankHistory(),
+    getLatestBoard(ranker),
+    getRankHistory(ranker),
   ]);
   const longs = board.rows.filter((r) => r.side === "long").length;
   const shorts = board.rows.length - longs;
   const n = board.listed;
   const top = board.rows[0];
+  const hours = rankHistory.hours.length;
+  const chartHint =
+    hours > 0 && hours < 24
+      ? ` · ${hours}h available`
+      : hours >= 24
+        ? " · last 24h"
+        : "";
 
   return (
     <main className="page">
       <section className="intro">
+        <div className="intro-tools">
+          <Suspense fallback={null}>
+            <RankerSwitch value={ranker} />
+          </Suspense>
+        </div>
         <h1 className="intro-title">
           Top {n} Hyperliquid wallets by {board.rankWindow} BagRank Heatmap.
         </h1>
@@ -28,9 +43,12 @@ export async function BoardHome() {
           Biggest tile = most of the top {n} are in it. Crowd hold map, not
           average rank inside each book. Green is long, red is short. Native
           and HIP-3 builder perps (xyz, io, and others) count the same; the
-          badge is the dex.
+          badge is the dex. Board below uses the{" "}
+          {rankerLabel(ranker).toLowerCase()} cohort (
+          {ranker === "pnl" ? "Hyperliquid default sort" : "return % sort"}).
         </p>
         <div className="meta">
+          <span>{rankerLabel(ranker)}</span>
           <span>
             top {n} · {board.rankWindow}
           </span>
@@ -56,8 +74,8 @@ export async function BoardHome() {
           <div className="panel-head-tools">
             <ShareOnX
               label="Share heatmap"
-              text={heatmapTweetText(top, n)}
-              url={heatmapShareUrl(board.cycleTs)}
+              text={heatmapTweetText(top, n, ranker)}
+              url={heatmapShareUrl(board.cycleTs, ranker)}
             />
             <RefreshMark capturedAt={board.capturedAt} />
           </div>
@@ -75,14 +93,18 @@ export async function BoardHome() {
 
       <section className="glass panel" id="ranks">
         <div className="panel-head">
-          <h2>crowd hold · last 24h</h2>
+          <h2>
+            hyperliquid {n} bagrank chart
+            {chartHint}
+          </h2>
         </div>
         {rankHistory.series.length ? (
           <RankChart history={rankHistory} />
         ) : (
           <div className="rank-chart empty-panel">
             <p>
-              {board.error ?? "Need a few hourly snapshots to draw 24h holds."}
+              {board.error ??
+                "Need at least one hourly snapshot to draw holds."}
             </p>
           </div>
         )}

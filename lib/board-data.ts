@@ -7,10 +7,13 @@ import {
   type PairRow,
   type Side,
 } from "@/lib/board";
-import { getSql } from "@/lib/db";
+import { getSql, missingDbMessage } from "@/lib/db";
+import { rankerMetric, type Ranker } from "@/lib/ranker";
 
 const VENUE = "hyperliquid";
 const RANK_WINDOW = process.env.RANK_WINDOW?.trim() || "week";
+
+type SqlClient = NonNullable<ReturnType<typeof getSql>>;
 
 type RunRow = {
   cycle_ts: Date | string;
@@ -55,7 +58,10 @@ function changePct(price: number | null, prev: number | null, open: number | nul
   return null;
 }
 
-function emptyBoard(partial: Partial<BoardSnapshot> = {}): BoardSnapshot {
+function emptyBoard(
+  ranker: Ranker,
+  partial: Partial<BoardSnapshot> = {},
+): BoardSnapshot {
   return {
     configured: true,
     error: null,
@@ -65,7 +71,8 @@ function emptyBoard(partial: Partial<BoardSnapshot> = {}): BoardSnapshot {
     snappedOk: 0,
     status: null,
     coverage: null,
-    rankWindow: rankWindowLabel(RANK_WINDOW),
+    rankWindow: rankWindowLabel(RANK_WINDOW, rankerMetric(ranker)),
+    ranker,
     rows: [],
     ...partial,
   };
@@ -102,34 +109,34 @@ function toPairRow(row: RunRow): PairRow | null {
   };
 }
 
-async function loadLatestBoard(): Promise<BoardSnapshot> {
-  const sql = getSql();
+async function loadLatestBoard(ranker: Ranker): Promise<BoardSnapshot> {
+  const sql = getSql(ranker);
   if (!sql) {
-    return emptyBoard({
+    return emptyBoard(ranker, {
       configured: false,
-      error: "Neon database URL is not set",
+      error: missingDbMessage(ranker),
     });
   }
 
   try {
     const rows = await queryLatestBoard(sql, true);
-    return boardFromRows(rows);
+    return boardFromRows(ranker, rows);
   } catch (err) {
     if (isMissingCoinPrices(err)) {
       try {
         const rows = await queryLatestBoard(sql, false);
-        return boardFromRows(rows);
+        return boardFromRows(ranker, rows);
       } catch (retryErr) {
-        return boardQueryError(retryErr);
+        return boardQueryError(ranker, retryErr);
       }
     }
-    return boardQueryError(err);
+    return boardQueryError(ranker, err);
   }
 }
 
-function boardFromRows(rows: RunRow[]): BoardSnapshot {
+function boardFromRows(ranker: Ranker, rows: RunRow[]): BoardSnapshot {
   if (!rows.length) {
-    return emptyBoard({
+    return emptyBoard(ranker, {
       error: "No snapshot in Neon yet",
     });
   }
@@ -148,7 +155,8 @@ function boardFromRows(rows: RunRow[]): BoardSnapshot {
     snappedOk: Math.max(0, Math.round(num(head.snapped_ok))),
     status: head.status,
     coverage: head.coverage == null ? null : num(head.coverage),
-    rankWindow: rankWindowLabel(RANK_WINDOW),
+    rankWindow: rankWindowLabel(RANK_WINDOW, rankerMetric(ranker)),
+    ranker,
     rows: pairRows,
   };
 }
@@ -158,7 +166,7 @@ function isMissingCoinPrices(err: unknown): boolean {
   return /coin_prices/i.test(message) && /does not exist/i.test(message);
 }
 
-function boardQueryError(err: unknown): BoardSnapshot {
+function boardQueryError(ranker: Ranker, err: unknown): BoardSnapshot {
   const message = err instanceof Error ? err.message : "Neon query failed";
   const missing =
     /relation .* does not exist/i.test(message) ||
@@ -166,7 +174,7 @@ function boardQueryError(err: unknown): BoardSnapshot {
       err !== null &&
       "code" in err &&
       err.code === "42P01");
-  return emptyBoard({
+  return emptyBoard(ranker, {
     error: missing
       ? "Collector tables not found on this Neon database"
       : message,
@@ -174,7 +182,7 @@ function boardQueryError(err: unknown): BoardSnapshot {
 }
 
 async function queryLatestBoard(
-  sql: NonNullable<ReturnType<typeof getSql>>,
+  sql: SqlClient,
   withPrices: boolean,
 ): Promise<RunRow[]> {
   if (withPrices) {
@@ -290,10 +298,13 @@ async function queryLatestBoard(
   `) as RunRow[];
 }
 
-export const getLatestBoard = unstable_cache(loadLatestBoard, ["board", VENUE], {
-  revalidate: 60,
-  tags: ["board"],
-});
+export async function getLatestBoard(ranker: Ranker): Promise<BoardSnapshot> {
+  return unstable_cache(
+    () => loadLatestBoard(ranker),
+    ["board", VENUE, ranker],
+    { revalidate: 60, tags: ["board", `board-${ranker}`] },
+  )();
+}
 
 const RANK_CAP = 5;
 
@@ -328,10 +339,11 @@ type HistRow = {
   wallets: number | string;
 };
 
-async function loadRankHistory(): Promise<RankHistory> {
-  const sql = getSql();
+async function loadRankHistory(ranker: Ranker): Promise<RankHistory> {
+  const sql = getSql(ranker);
   if (!sql) return { hours: [], series: [] };
   try {
+    // Up to last 24 ok/partial hours; fewer available hours still chart.
     const rows = (await sql`
       WITH hours AS (
         SELECT cycle_ts
@@ -420,7 +432,10 @@ async function loadRankHistory(): Promise<RankHistory> {
   }
 }
 
-export const getRankHistory = unstable_cache(loadRankHistory, ["rank-history", VENUE], {
-  revalidate: 60,
-  tags: ["board"],
-});
+export async function getRankHistory(ranker: Ranker): Promise<RankHistory> {
+  return unstable_cache(
+    () => loadRankHistory(ranker),
+    ["rank-history", VENUE, ranker],
+    { revalidate: 60, tags: ["board", `board-${ranker}`] },
+  )();
+}

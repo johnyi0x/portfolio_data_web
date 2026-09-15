@@ -21,9 +21,10 @@ export default function AboutPage() {
       <section className="glass panel about-panel">
         <h2>Why it exists</h2>
         <p>
-          A 7-day ROI list only tells you who printed. It does not tell you
-          what they are sitting in right now. Copy-trading one wallet is the
-          other extreme: you inherit that person’s noise, size, and luck.
+          A Hyperliquid leaderboard only tells you who printed. It does not
+          tell you what they are sitting in right now. Copy-trading one
+          wallet is the other extreme: you inherit that person’s noise, size,
+          and luck.
         </p>
         <p>
           bagrank sits in the middle. Every hour it asks: of the 200 wallets
@@ -34,21 +35,27 @@ export default function AboutPage() {
           alone.
         </p>
         <p>
+          The board defaults to Hyperliquid’s own sort — top 200 by 7-day
+          PnL. You can switch to 7-day ROI ranker on the homepage. Each
+          ranker has its own hourly Neon history.
+        </p>
+        <p>
           If 40 of those 200 are long HYPE, that is a different story than
           “HYPE is up on the leaderboard.” If they all dump HYPE by the next
           hour, the tile shrinks. You are watching the crowd’s book, not
-          yesterday’s PnL.
+          yesterday’s scoreboard.
         </p>
       </section>
 
       <section className="glass panel about-panel">
         <h2>Who gets counted</h2>
         <p>
-          Each hour: take the top 200 Hyperliquid wallets by 7-day ROI,
-          snapshot their open perps, then rank pairs by how many of those
-          wallets are in them. Cash is not a pair. Rank is wallet count, not
-          a Nasdaq-style index. Each hour also stores that pair’s mark and
-          1h candle so later hours are not a board without a price.
+          Each hour: take the top 200 Hyperliquid wallets by 7-day PnL (site
+          default) or 7-day ROI (toggle), snapshot their open perps, then
+          rank pairs by how many of those wallets are in them. Cash is not a
+          pair. Rank is wallet count, not a Nasdaq-style index. Each hour
+          also stores that pair’s mark and 1h candle so later hours are not a
+          board without a price.
         </p>
         <p>
           Native perps and HIP-3 builder perps count the same. That includes
@@ -91,7 +98,7 @@ export default function AboutPage() {
           </li>
           <li>
             No open perps, only cash: 0 votes. That wallet is in the 200 for
-            ROI but does not move any tile.
+            PnL or ROI but does not move any tile.
           </li>
           <li>
             One whale 100% long BTC vs 30 small wallets each 5% long BTC: 31

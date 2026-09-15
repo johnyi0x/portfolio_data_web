@@ -28,6 +28,7 @@ export type BoardSnapshot = {
   status: string | null;
   coverage: number | null;
   rankWindow: string;
+  ranker: "pnl" | "roi";
   rows: PairRow[];
 };
 
@@ -39,12 +40,15 @@ export function splitCoin(coin: string): { label: string; dex: string } {
   return { dex: "", label: coin };
 }
 
-export function rankWindowLabel(window: string): string {
+export function rankWindowLabel(
+  window: string,
+  metric: "ROI" | "PnL" = "ROI",
+): string {
   const w = window.trim().toLowerCase();
-  if (w === "week" || w.includes("week")) return "7-day ROI";
-  if (w === "day" || w.includes("day")) return "1-day ROI";
-  if (w === "month" || w.includes("month")) return "30-day ROI";
-  return "7-day ROI";
+  if (w === "week" || w.includes("week")) return `7-day ${metric}`;
+  if (w === "day" || w.includes("day")) return `1-day ${metric}`;
+  if (w === "month" || w.includes("month")) return `30-day ${metric}`;
+  return `7-day ${metric}`;
 }
 
 export function formatUtcStamp(value: Date | string | null | undefined): string | null {

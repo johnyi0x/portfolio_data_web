@@ -238,6 +238,42 @@ body {
   margin-bottom: 22px;
 }
 
+.intro-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.ranker-switch {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--well);
+}
+
+.ranker-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 560;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ranker-switch button.on {
+  background: var(--menu);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
 .intro-title {
   margin: 0 0 8px;
   font-size: 18px;

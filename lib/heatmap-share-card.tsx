@@ -5,6 +5,7 @@ import {
   tileFill,
   tileType,
 } from "@/lib/heatmap-layout";
+import { DEFAULT_RANKER, rankerLabel } from "@/lib/ranker";
 import { squarify } from "@/lib/squarify";
 
 /** X summary_large_image slot. Square cards get center-cropped. */
@@ -30,6 +31,7 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
   const scale = mapH / 560;
   const mark = markBox(mapW);
   const listed = board.listed || 200;
+  const who = rankerLabel(board.ranker ?? DEFAULT_RANKER).toUpperCase();
   const refreshed = board.capturedAt
     ? `LAST REFRESHED AT ${board.capturedAt} UTC`
     : "LAST REFRESHED —";
@@ -83,7 +85,7 @@ export function HeatmapShareCard({ board }: { board: BoardSnapshot }) {
             color: MUTED,
           }}
         >
-          HYPERLIQUID {listed} BAGRANK HEATMAP
+          HYPERLIQUID {listed} BAGRANK · {who}
         </div>
         <div
           style={{
