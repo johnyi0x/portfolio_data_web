@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getLatestBoard } from "@/lib/board-data";
+import { getBoard } from "@/lib/board-data";
 import {
   HEATMAP_OG_HEIGHT,
   HEATMAP_OG_WIDTH,
@@ -12,7 +12,7 @@ export const revalidate = 3600;
 
 export async function GET(req: Request) {
   const ranker = parseRanker(new URL(req.url).searchParams.get("ranker"));
-  const board = await getLatestBoard(ranker);
+  const board = await getBoard(ranker);
   const image = new ImageResponse(<HeatmapShareCard board={board} />, {
     width: HEATMAP_OG_WIDTH,
     height: HEATMAP_OG_HEIGHT,

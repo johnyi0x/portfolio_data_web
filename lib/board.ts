@@ -14,6 +14,8 @@ export type PairRow = {
   agreement: number;
   leverage: number;
   rankDelta: number | null;
+  prevHoldPct: number | null;
+  holdDelta: number | null;
   price: number | null;
   changePct: number | null;
 };
@@ -28,7 +30,7 @@ export type BoardSnapshot = {
   status: string | null;
   coverage: number | null;
   rankWindow: string;
-  ranker: "pnl" | "roi";
+  ranker: "pnl" | "roi" | "both";
   rows: PairRow[];
 };
 
@@ -42,7 +44,7 @@ export function splitCoin(coin: string): { label: string; dex: string } {
 
 export function rankWindowLabel(
   window: string,
-  metric: "ROI" | "PnL" = "ROI",
+  metric: "ROI" | "PnL" | "PnL + ROI" = "ROI",
 ): string {
   const w = window.trim().toLowerCase();
   if (w === "week" || w.includes("week")) return `7-day ${metric}`;
@@ -85,6 +87,13 @@ export function formatPxCompact(n: number | null | undefined): string {
   if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (abs >= 10_000) return `${(n / 1000).toFixed(1)}k`;
   return formatPx(n);
+}
+
+export function formatHoldDelta(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const pp = n * 100;
+  const sign = pp > 0 ? "+" : "";
+  return `${sign}${pp.toFixed(1)}`;
 }
 
 export function formatChgPct(n: number | null | undefined): string {

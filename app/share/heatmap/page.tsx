@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { BoardHome } from "@/components/BoardHome";
-import { getLatestBoard } from "@/lib/board-data";
+import { getBoard } from "@/lib/board-data";
 import { parseRanker } from "@/lib/ranker";
 import { heatmapCardMetadata, heatmapSharePath } from "@/lib/share";
 
@@ -13,7 +13,7 @@ type Props = {
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const q = await searchParams;
   const ranker = parseRanker(q.ranker);
-  const board = await getLatestBoard(ranker);
+  const board = await getBoard(ranker);
   const top = board.rows[0];
   const title = top
     ? `${top.label} ${top.side} ${Math.round(top.holdPct * 1000) / 10}% · heatmap`

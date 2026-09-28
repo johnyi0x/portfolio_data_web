@@ -1,12 +1,12 @@
 import { neon } from "@neondatabase/serverless";
-import { type Ranker } from "@/lib/ranker";
+import { type NeonRanker } from "@/lib/ranker";
 
 type Sql = ReturnType<typeof neon>;
 
-const clients = new Map<Ranker, Sql>();
+const clients = new Map<NeonRanker, Sql>();
 
 /** PnL Neon (site default). ROI uses ROI-specific or legacy single URL. */
-export function databaseUrl(ranker: Ranker): string {
+export function databaseUrl(ranker: NeonRanker): string {
   if (ranker === "pnl") {
     return (
       process.env.BAGINDEX_DATABASE_URL_PNL?.trim() ||
@@ -23,7 +23,7 @@ export function databaseUrl(ranker: Ranker): string {
   );
 }
 
-export function getSql(ranker: Ranker): Sql | null {
+export function getSql(ranker: NeonRanker): Sql | null {
   const url = databaseUrl(ranker);
   if (!url) return null;
   let sql = clients.get(ranker);
@@ -34,7 +34,7 @@ export function getSql(ranker: Ranker): Sql | null {
   return sql;
 }
 
-export function missingDbMessage(ranker: Ranker): string {
+export function missingDbMessage(ranker: NeonRanker): string {
   if (ranker === "pnl") {
     return "PnL Neon URL is not set (BAGINDEX_DATABASE_URL_PNL or DATABASE_URL_PNL)";
   }

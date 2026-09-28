@@ -36,14 +36,17 @@ export default function AboutPage() {
         </p>
         <p>
           The board defaults to Hyperliquid’s own sort — top 200 by 7-day
-          PnL. You can switch to 7-day ROI ranker on the homepage. Each
-          ranker has its own hourly Neon history.
+          PnL. You can switch to 7-day ROI, or to PnL + ROI, which is not a
+          third collector: it overlaps this hour’s two boards in memory and
+          keeps pairs both crowds hold on the same side. Each single ranker
+          has its own hourly Neon history.
         </p>
         <p>
           If 40 of those 200 are long HYPE, that is a different story than
           “HYPE is up on the leaderboard.” If they all dump HYPE by the next
-          hour, the tile shrinks. You are watching the crowd’s book, not
-          yesterday’s scoreboard.
+          hour, the tile shrinks and the movers panel ranks that hold-point
+          change against last hour, with the 1h mark next to it. You are
+          watching the crowd’s book, not yesterday’s scoreboard.
         </p>
       </section>
 
@@ -52,10 +55,11 @@ export default function AboutPage() {
         <p>
           Each hour: take the top 200 Hyperliquid wallets by 7-day PnL (site
           default) or 7-day ROI (toggle), snapshot their open perps, then
-          rank pairs by how many of those wallets are in them. Cash is not a
-          pair. Rank is wallet count, not a Nasdaq-style index. Each hour
-          also stores that pair’s mark and 1h candle so later hours are not a
-          board without a price.
+          rank pairs by how many of those wallets are in them. PnL + ROI
+          does not snapshot a third list; it is the same-side overlap of
+          those two hourly maps. Cash is not a pair. Rank is wallet count,
+          not a Nasdaq-style index. Each hour also stores that pair’s mark
+          and 1h candle so later hours are not a board without a price.
         </p>
         <p>
           Native perps and HIP-3 builder perps count the same. That includes

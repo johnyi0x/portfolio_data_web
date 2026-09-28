@@ -52,6 +52,8 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
           <tr>
             <th className="num">rank#</th>
             <th>Pair</th>
+            <th>Side</th>
+            <th className="num">Hold</th>
             <th className="num" title="Mark at snapshot, else 1h close">
               Price
             </th>
@@ -61,8 +63,6 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
             >
               1h
             </th>
-            <th>Side</th>
-            <th className="num">Hold</th>
             <th className="num">Wallets</th>
             <th className="num">On coin</th>
             <th>L / S</th>
@@ -81,16 +81,16 @@ export function Leaderboard({ rows }: { rows: PairRow[] }) {
                   <RankMove delta={row.rankDelta} />
                 </span>
               </td>
-              <td className="num">{formatPx(row.price)}</td>
-              <td className="num">
-                <PxChange value={row.changePct} />
-              </td>
               <td>
                 <span className={row.side === "long" ? "tag long" : "tag short"}>
                   {row.side}
                 </span>
               </td>
               <td className="num">{pct(row.holdPct)}</td>
+              <td className="num">{formatPx(row.price)}</td>
+              <td className="num">
+                <PxChange value={row.changePct} />
+              </td>
               <td className="num">{row.wallets}</td>
               <td className="num">{row.onCoin}</td>
               <td className="split">

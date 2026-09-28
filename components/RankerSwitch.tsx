@@ -6,6 +6,7 @@ import { DEFAULT_RANKER, type Ranker } from "@/lib/ranker";
 const OPTIONS: { id: Ranker; label: string }[] = [
   { id: "pnl", label: "PnL ranker" },
   { id: "roi", label: "ROI ranker" },
+  { id: "both", label: "PnL + ROI" },
 ];
 
 export function RankerSwitch({ value }: { value: Ranker }) {

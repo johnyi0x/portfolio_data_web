@@ -8,7 +8,7 @@ import {
   type Side,
 } from "@/lib/board";
 import { getSql, missingDbMessage } from "@/lib/db";
-import { rankerMetric, type Ranker } from "@/lib/ranker";
+import { rankerMetric, type NeonRanker, type Ranker } from "@/lib/ranker";
 
 const VENUE = "hyperliquid";
 const RANK_WINDOW = process.env.RANK_WINDOW?.trim() || "week";
@@ -32,6 +32,7 @@ type RunRow = {
   median_leverage: number | string | null;
   rank: number | string | null;
   prev_rank: number | string | null;
+  prev_hold_pct: number | string | null;
   mark_px: number | string | null;
   ohlc_close: number | string | null;
   ohlc_open: number | string | null;
@@ -43,6 +44,12 @@ function num(value: unknown, fallback = 0): number {
   if (value == null || value === "") return fallback;
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function holdOrNull(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 function numOrNull(value: unknown): number | null {
@@ -87,6 +94,8 @@ function toPairRow(row: RunRow): PairRow | null {
   const price = numOrNull(row.mark_px) ?? numOrNull(row.ohlc_close);
   const prevPrice = numOrNull(row.prev_mark_px) ?? numOrNull(row.prev_ohlc_close);
   const open = numOrNull(row.ohlc_open);
+  const holdPct = num(row.hold_pct);
+  const prevHoldPct = holdOrNull(row.prev_hold_pct);
   return {
     rank: num(row.rank),
     coin: row.coin,
@@ -97,19 +106,21 @@ function toPairRow(row: RunRow): PairRow | null {
     onCoin: longN + shortN,
     longN,
     shortN,
-    holdPct: num(row.hold_pct),
+    holdPct,
     agreement: num(row.agreement),
     leverage: Math.max(1, Math.round(num(row.median_leverage, 1))),
     rankDelta:
       row.prev_rank == null || row.prev_rank === ""
         ? null
         : num(row.prev_rank) - num(row.rank),
+    prevHoldPct,
+    holdDelta: prevHoldPct == null ? null : holdPct - prevHoldPct,
     price,
     changePct: changePct(price, prevPrice, open),
   };
 }
 
-async function loadLatestBoard(ranker: Ranker): Promise<BoardSnapshot> {
+async function loadLatestBoard(ranker: NeonRanker): Promise<BoardSnapshot> {
   const sql = getSql(ranker);
   if (!sql) {
     return emptyBoard(ranker, {
@@ -134,7 +145,7 @@ async function loadLatestBoard(ranker: Ranker): Promise<BoardSnapshot> {
   }
 }
 
-function boardFromRows(ranker: Ranker, rows: RunRow[]): BoardSnapshot {
+function boardFromRows(ranker: NeonRanker, rows: RunRow[]): BoardSnapshot {
   if (!rows.length) {
     return emptyBoard(ranker, {
       error: "No snapshot in Neon yet",
@@ -166,7 +177,7 @@ function isMissingCoinPrices(err: unknown): boolean {
   return /coin_prices/i.test(message) && /does not exist/i.test(message);
 }
 
-function boardQueryError(ranker: Ranker, err: unknown): BoardSnapshot {
+function boardQueryError(ranker: NeonRanker, err: unknown): BoardSnapshot {
   const message = err instanceof Error ? err.message : "Neon query failed";
   const missing =
     /relation .* does not exist/i.test(message) ||
@@ -221,6 +232,7 @@ async function queryLatestBoard(
         m.median_leverage,
         m.rank,
         p.rank AS prev_rank,
+        p.hold_pct AS prev_hold_pct,
         cp.mark_px,
         cp.ohlc_close,
         cp.ohlc_open,
@@ -281,6 +293,7 @@ async function queryLatestBoard(
       m.median_leverage,
       m.rank,
       p.rank AS prev_rank,
+      p.hold_pct AS prev_hold_pct,
       NULL::numeric AS mark_px,
       NULL::numeric AS ohlc_close,
       NULL::numeric AS ohlc_open,
@@ -298,7 +311,7 @@ async function queryLatestBoard(
   `) as RunRow[];
 }
 
-export async function getLatestBoard(ranker: Ranker): Promise<BoardSnapshot> {
+export async function getLatestBoard(ranker: NeonRanker): Promise<BoardSnapshot> {
   return unstable_cache(
     () => loadLatestBoard(ranker),
     ["board", VENUE, ranker],
@@ -339,7 +352,7 @@ type HistRow = {
   wallets: number | string;
 };
 
-async function loadRankHistory(ranker: Ranker): Promise<RankHistory> {
+async function loadRankHistory(ranker: NeonRanker): Promise<RankHistory> {
   const sql = getSql(ranker);
   if (!sql) return { hours: [], series: [] };
   try {
@@ -432,10 +445,172 @@ async function loadRankHistory(ranker: Ranker): Promise<RankHistory> {
   }
 }
 
-export async function getRankHistory(ranker: Ranker): Promise<RankHistory> {
+export async function getRankHistory(ranker: NeonRanker): Promise<RankHistory> {
   return unstable_cache(
     () => loadRankHistory(ranker),
     ["rank-history", VENUE, ranker],
     { revalidate: 60, tags: ["board", `board-${ranker}`] },
   )();
 }
+
+function geoMean(a: number, b: number): number {
+  return Math.sqrt(Math.max(0, a) * Math.max(0, b));
+}
+
+function combinePair(pnl: PairRow, roi: PairRow): PairRow {
+  const holdPct = geoMean(pnl.holdPct, roi.holdPct);
+  const prevP = pnl.prevHoldPct;
+  const prevR = roi.prevHoldPct;
+  const prevHoldPct =
+    prevP != null && prevR != null ? geoMean(prevP, prevR) : null;
+  return {
+    rank: 0,
+    coin: pnl.coin,
+    label: pnl.label,
+    dex: pnl.dex,
+    side: pnl.side,
+    wallets: Math.round((pnl.wallets + roi.wallets) / 2),
+    onCoin: Math.round((pnl.onCoin + roi.onCoin) / 2),
+    longN: Math.round((pnl.longN + roi.longN) / 2),
+    shortN: Math.round((pnl.shortN + roi.shortN) / 2),
+    holdPct,
+    agreement: Math.min(pnl.agreement, roi.agreement),
+    leverage: Math.max(1, Math.round((pnl.leverage + roi.leverage) / 2)),
+    rankDelta: null,
+    prevHoldPct,
+    holdDelta: prevHoldPct == null ? null : holdPct - prevHoldPct,
+    price: pnl.price ?? roi.price,
+    changePct: pnl.changePct ?? roi.changePct,
+  };
+}
+
+function combineBoards(pnl: BoardSnapshot, roi: BoardSnapshot): BoardSnapshot {
+  if (!pnl.configured) {
+    return emptyBoard("both", { configured: false, error: pnl.error });
+  }
+  if (!roi.configured) {
+    return emptyBoard("both", { configured: false, error: roi.error });
+  }
+  if (pnl.error && !pnl.rows.length) {
+    return emptyBoard("both", { error: `PnL: ${pnl.error}` });
+  }
+  if (roi.error && !roi.rows.length) {
+    return emptyBoard("both", { error: `ROI: ${roi.error}` });
+  }
+
+  const roiByCoin = new Map(roi.rows.map((row) => [row.coin, row]));
+  const merged: PairRow[] = [];
+  for (const p of pnl.rows) {
+    const r = roiByCoin.get(p.coin);
+    if (!r || r.side !== p.side) continue;
+    merged.push(combinePair(p, r));
+  }
+  merged.sort((a, b) => b.holdPct - a.holdPct || b.wallets - a.wallets);
+  merged.forEach((row, i) => {
+    row.rank = i + 1;
+  });
+
+  const listed = Math.max(pnl.listed, roi.listed, 200);
+  const snappedOk = Math.min(pnl.snappedOk || listed, roi.snappedOk || listed);
+  const capturedAt = [pnl.capturedAt, roi.capturedAt]
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null;
+
+  return {
+    configured: true,
+    error: merged.length ? null : "No same-side overlap between PnL and ROI boards this hour",
+    cycleTs: pnl.cycleTs || roi.cycleTs,
+    capturedAt,
+    listed,
+    snappedOk,
+    status: pnl.status === "ok" && roi.status === "ok" ? "ok" : pnl.status || roi.status,
+    coverage:
+      pnl.coverage != null && roi.coverage != null
+        ? Math.min(pnl.coverage, roi.coverage)
+        : (pnl.coverage ?? roi.coverage),
+    rankWindow: rankWindowLabel(RANK_WINDOW, "PnL + ROI"),
+    ranker: "both",
+    rows: merged,
+  };
+}
+
+function combineHistories(
+  pnl: RankHistory,
+  roi: RankHistory,
+  overlapCoins: Set<string>,
+): RankHistory {
+  const roiByCoin = new Map(roi.series.map((s) => [s.coin, s]));
+  const hourMap = new Map<number, { ts: number; stamp: string }>();
+  for (const h of pnl.hours) hourMap.set(h.ts, h);
+  for (const h of roi.hours) {
+    if (hourMap.has(h.ts)) hourMap.set(h.ts, h);
+  }
+  // Only hours both collectors stored (same cycle_ts bucket).
+  const bothHours = new Set(pnl.hours.map((h) => h.ts));
+  const hours = [...hourMap.values()]
+    .filter((h) => bothHours.has(h.ts) && roi.hours.some((x) => x.ts === h.ts))
+    .sort((a, b) => a.ts - b.ts);
+
+  const series: RankHistorySeries[] = [];
+  for (const pSeries of pnl.series) {
+    if (!overlapCoins.has(pSeries.coin)) continue;
+    const rSeries = roiByCoin.get(pSeries.coin);
+    if (!rSeries) continue;
+    const rByTs = new Map(rSeries.points.map((pt) => [pt.ts, pt]));
+    const points: RankHistoryPoint[] = [];
+    for (const h of hours) {
+      const a = pSeries.points.find((pt) => pt.ts === h.ts);
+      const b = rByTs.get(h.ts);
+      if (!a || !b || a.side !== b.side) continue;
+      points.push({
+        ts: h.ts,
+        stamp: h.stamp,
+        rank: Math.min(a.rank, b.rank),
+        side: a.side,
+        holdPct: geoMean(a.holdPct, b.holdPct),
+        wallets: Math.round((a.wallets + b.wallets) / 2),
+      });
+    }
+    if (points.length < 1) continue;
+    series.push({
+      coin: pSeries.coin,
+      label: pSeries.label,
+      dex: pSeries.dex,
+      latestRank: points[points.length - 1].rank,
+      points,
+    });
+  }
+  series.sort((a, b) => {
+    const ah = a.points[a.points.length - 1]?.holdPct ?? 0;
+    const bh = b.points[b.points.length - 1]?.holdPct ?? 0;
+    return bh - ah;
+  });
+  return { hours, series: series.slice(0, RANK_CAP) };
+}
+
+/** Latest board for any tab. Combined view joins cached PnL + ROI — no extra SQL. */
+export async function getBoard(ranker: Ranker): Promise<BoardSnapshot> {
+  if (ranker !== "both") return getLatestBoard(ranker);
+  const [pnl, roi] = await Promise.all([getLatestBoard("pnl"), getLatestBoard("roi")]);
+  return combineBoards(pnl, roi);
+}
+
+/** 24h hold series. Combined view joins cached histories in memory. */
+export async function getHistory(ranker: Ranker): Promise<RankHistory> {
+  if (ranker !== "both") return getRankHistory(ranker);
+  const [pnlBoard, roiBoard, pnlH, roiH] = await Promise.all([
+    getLatestBoard("pnl"),
+    getLatestBoard("roi"),
+    getRankHistory("pnl"),
+    getRankHistory("roi"),
+  ]);
+  const overlap = new Set<string>();
+  const roiCoins = new Map(roiBoard.rows.map((r) => [r.coin, r]));
+  for (const p of pnlBoard.rows) {
+    const r = roiCoins.get(p.coin);
+    if (r && r.side === p.side) overlap.add(p.coin);
+  }
+  return combineHistories(pnlH, roiH, overlap);
+}
+
