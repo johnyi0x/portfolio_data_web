@@ -53,12 +53,20 @@ export function heatmapTweetText(
   ranker: Ranker = DEFAULT_RANKER,
 ): string {
   const who = rankerLabel(ranker).toLowerCase();
+  const crowd =
+    ranker === "both"
+      ? "pnl + roi"
+      : `hyperliquid top ${listed} ${who}`;
   if (!row) {
-    return `hyperliquid top ${listed} ${who} hold map on bagrank`;
+    return ranker === "both"
+      ? `hyperliquid pnl + roi hold map on bagrank`
+      : `hyperliquid top ${listed} ${who} hold map on bagrank`;
   }
   const pct = Math.round(row.holdPct * 1000) / 10;
   const name = row.dex ? `${row.label} ${row.dex}` : row.label;
-  return `${name} ${row.side} is dominating with ${pct}% on bagrank (${who}).\nare hyperliquid top ${listed} traders know something we dont?`;
+  return ranker === "both"
+    ? `${name} ${row.side} is dominating with ${pct}% on bagrank (${crowd}).\nare hyperliquid pnl + roi traders know something we dont?`
+    : `${name} ${row.side} is dominating with ${pct}% on bagrank (${who}).\nare hyperliquid top ${listed} traders know something we dont?`;
 }
 
 export function xIntentUrl(text: string, url: string): string {

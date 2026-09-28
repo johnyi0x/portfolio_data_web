@@ -37,8 +37,9 @@ export default function AboutPage() {
         <p>
           The board defaults to Hyperliquid’s own sort — top 200 by 7-day
           PnL. You can switch to 7-day ROI, or to PnL + ROI, which is not a
-          third collector: it overlaps this hour’s two boards in memory and
-          keeps pairs both crowds hold on the same side. Each single ranker
+          third collector: it adds this hour’s two boards in memory. 20
+          wallets on PnL and 10 on ROI is 30 wallets on the combined map.
+          Hold is that total over the two snapshots. Each single ranker
           has its own hourly Neon history.
         </p>
         <p>
@@ -56,10 +57,11 @@ export default function AboutPage() {
           Each hour: take the top 200 Hyperliquid wallets by 7-day PnL (site
           default) or 7-day ROI (toggle), snapshot their open perps, then
           rank pairs by how many of those wallets are in them. PnL + ROI
-          does not snapshot a third list; it is the same-side overlap of
-          those two hourly maps. Cash is not a pair. Rank is wallet count,
-          not a Nasdaq-style index. Each hour also stores that pair’s mark
-          and 1h candle so later hours are not a board without a price.
+          does not snapshot a third list; it adds the two hourly maps. A
+          pair only on PnL still appears, with the ROI side contributing
+          zero. Cash is not a pair. Rank is wallet count, not a Nasdaq-style
+          index. Each hour also stores that pair’s mark and 1h candle so
+          later hours are not a board without a price.
         </p>
         <p>
           Native perps and HIP-3 builder perps count the same. That includes

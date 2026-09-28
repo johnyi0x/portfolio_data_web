@@ -37,17 +37,18 @@ export async function BoardHome({ ranker }: { ranker: Ranker }) {
         </div>
         <h1 className="intro-title">
           {ranker === "both"
-            ? `Same-side overlap of top ${n} PnL and top ${n} ROI wallets.`
+            ? `PnL top 200 plus ROI top 200 · ${n} votes this hour.`
             : `Top ${n} Hyperliquid wallets by ${board.rankWindow} BagRank Heatmap.`}
         </h1>
         <p className="intro-copy">
           {ranker === "both" ? (
             <>
-              This tab does not snapshot a third wallet list. It joins this
-              hour’s PnL board and ROI board in memory: a pair only appears
-              if both crowds hold it on the same side. Tile size is combined
-              hold (geometric mean of the two hold %). Green is long, red is
-              short. Native and HIP-3 builder perps count the same.
+              This tab does not snapshot a third wallet list. It adds this
+              hour’s PnL board to this hour’s ROI board: 20 wallets on PnL
+              and 10 on ROI is 30 wallets here. Hold is that total over the
+              two snapshots. Same wallet can sit in both 200s; this is two
+              vote totals, not unique people. Green is long, red is short.
+              Native and HIP-3 builder perps count the same.
             </>
           ) : (
             <>
@@ -69,7 +70,7 @@ export async function BoardHome({ ranker }: { ranker: Ranker }) {
           <span>{rankerLabel(ranker)}</span>
           <span>
             {ranker === "both"
-              ? `overlap · ${board.rankWindow}`
+              ? `${n} votes · ${board.rankWindow}`
               : `top ${n} · ${board.rankWindow}`}
           </span>
           {board.capturedAt ? <span>{board.capturedAt} UTC</span> : null}
@@ -90,11 +91,7 @@ export async function BoardHome({ ranker }: { ranker: Ranker }) {
 
       <section className="glass panel" id="heatmap">
         <div className="panel-head">
-          <h2>
-            {ranker === "both"
-              ? `hyperliquid overlap heatmap`
-              : `hyperliquid ${n} bagrank heatmap`}
-          </h2>
+          <h2>{`hyperliquid ${n} bagrank heatmap`}</h2>
           <div className="panel-head-tools">
             <ShareOnX
               label="Share heatmap"
@@ -117,21 +114,14 @@ export async function BoardHome({ ranker }: { ranker: Ranker }) {
 
       <section className="glass panel" id="ranks">
         <div className="panel-head">
-          <h2>
-            {ranker === "both"
-              ? `hyperliquid overlap chart${chartHint}`
-              : `hyperliquid ${n} bagrank chart${chartHint}`}
-          </h2>
+          <h2>{`hyperliquid ${n} bagrank chart${chartHint}`}</h2>
         </div>
         {rankHistory.series.length ? (
           <RankChart history={rankHistory} />
         ) : (
           <div className="rank-chart empty-panel">
             <p>
-              {board.error ??
-                (ranker === "both" && board.rows.length
-                  ? "Overlap is on the heatmap. The 24h chart only draws names that appear in both rankers’ top 5 this window."
-                  : "Need at least one hourly snapshot to draw holds.")}
+              {board.error ?? "Need at least one hourly snapshot to draw holds."}
             </p>
           </div>
         )}
@@ -139,11 +129,7 @@ export async function BoardHome({ ranker }: { ranker: Ranker }) {
 
       <section className="glass panel" id="flow">
         <div className="panel-head">
-          <h2>
-            {ranker === "both"
-              ? "hyperliquid overlap movers · vs last hour"
-              : `hyperliquid ${n} bagrank movers · vs last hour`}
-          </h2>
+          <h2>{`hyperliquid ${n} bagrank movers · vs last hour`}</h2>
         </div>
         {board.rows.length ? (
           <CrowdMovers rows={board.rows} />
@@ -156,11 +142,7 @@ export async function BoardHome({ ranker }: { ranker: Ranker }) {
 
       <section className="glass panel">
         <div className="panel-head">
-          <h2>
-            {ranker === "both"
-              ? "hyperliquid overlap leaderboard"
-              : `hyperliquid ${n} bagrank leaderboard`}
-          </h2>
+          <h2>{`hyperliquid ${n} bagrank leaderboard`}</h2>
         </div>
         {board.rows.length ? (
           <Leaderboard rows={board.rows} />

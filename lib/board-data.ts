@@ -33,6 +33,9 @@ type RunRow = {
   rank: number | string | null;
   prev_rank: number | string | null;
   prev_hold_pct: number | string | null;
+  prev_long_n: number | string | null;
+  prev_short_n: number | string | null;
+  prev_snapped_ok: number | string | null;
   mark_px: number | string | null;
   ohlc_close: number | string | null;
   ohlc_open: number | string | null;
@@ -44,6 +47,12 @@ function num(value: unknown, fallback = 0): number {
   if (value == null || value === "") return fallback;
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function intOrNull(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
 }
 
 function holdOrNull(value: unknown): number | null {
@@ -76,6 +85,7 @@ function emptyBoard(
     capturedAt: null,
     listed: 200,
     snappedOk: 0,
+    prevSnappedOk: null,
     status: null,
     coverage: null,
     rankWindow: rankWindowLabel(RANK_WINDOW, rankerMetric(ranker)),
@@ -96,6 +106,8 @@ function toPairRow(row: RunRow): PairRow | null {
   const open = numOrNull(row.ohlc_open);
   const holdPct = num(row.hold_pct);
   const prevHoldPct = holdOrNull(row.prev_hold_pct);
+  const prevLongN = intOrNull(row.prev_long_n);
+  const prevShortN = intOrNull(row.prev_short_n);
   return {
     rank: num(row.rank),
     coin: row.coin,
@@ -114,6 +126,8 @@ function toPairRow(row: RunRow): PairRow | null {
         ? null
         : num(row.prev_rank) - num(row.rank),
     prevHoldPct,
+    prevLongN,
+    prevShortN,
     holdDelta: prevHoldPct == null ? null : holdPct - prevHoldPct,
     price,
     changePct: changePct(price, prevPrice, open),
@@ -164,6 +178,7 @@ function boardFromRows(ranker: NeonRanker, rows: RunRow[]): BoardSnapshot {
     capturedAt: formatUtcStamp(head.finished_at) ?? formatUtcStamp(head.cycle_ts),
     listed: Math.max(1, Math.round(num(head.listed, 200))),
     snappedOk: Math.max(0, Math.round(num(head.snapped_ok))),
+    prevSnappedOk: intOrNull(head.prev_snapped_ok),
     status: head.status,
     coverage: head.coverage == null ? null : num(head.coverage),
     rankWindow: rankWindowLabel(RANK_WINDOW, rankerMetric(ranker)),
@@ -233,6 +248,12 @@ async function queryLatestBoard(
         m.rank,
         p.rank AS prev_rank,
         p.hold_pct AS prev_hold_pct,
+        p.long_n AS prev_long_n,
+        p.short_n AS prev_short_n,
+        (SELECT snapped_ok FROM collector_runs
+          WHERE venue = ${VENUE}
+            AND cycle_ts = (SELECT cycle_ts FROM prev_cycle)
+          LIMIT 1) AS prev_snapped_ok,
         cp.mark_px,
         cp.ohlc_close,
         cp.ohlc_open,
@@ -294,6 +315,12 @@ async function queryLatestBoard(
       m.rank,
       p.rank AS prev_rank,
       p.hold_pct AS prev_hold_pct,
+      p.long_n AS prev_long_n,
+      p.short_n AS prev_short_n,
+      (SELECT snapped_ok FROM collector_runs
+        WHERE venue = ${VENUE}
+          AND cycle_ts = (SELECT cycle_ts FROM prev_cycle)
+        LIMIT 1) AS prev_snapped_ok,
       NULL::numeric AS mark_px,
       NULL::numeric AS ohlc_close,
       NULL::numeric AS ohlc_open,
@@ -453,34 +480,71 @@ export async function getRankHistory(ranker: NeonRanker): Promise<RankHistory> {
   )();
 }
 
-function geoMean(a: number, b: number): number {
-  return Math.sqrt(Math.max(0, a) * Math.max(0, b));
+function votes(n: number | null | undefined): number {
+  return n == null || !Number.isFinite(n) ? 0 : Math.max(0, n);
 }
 
-function combinePair(pnl: PairRow, roi: PairRow): PairRow {
-  const holdPct = geoMean(pnl.holdPct, roi.holdPct);
-  const prevP = pnl.prevHoldPct;
-  const prevR = roi.prevHoldPct;
+function majorityOf(longN: number, shortN: number): { side: Side; wallets: number } {
+  if (shortN > longN) return { side: "short", wallets: shortN };
+  return { side: "long", wallets: Math.max(0, longN) };
+}
+
+function addPair(
+  pnl: PairRow | undefined,
+  roi: PairRow | undefined,
+  denom: number,
+  prevDenom: number,
+): PairRow | null {
+  const src = pnl ?? roi;
+  if (!src) return null;
+  const longN = votes(pnl?.longN) + votes(roi?.longN);
+  const shortN = votes(pnl?.shortN) + votes(roi?.shortN);
+  if (longN + shortN <= 0) return null;
+  const { side, wallets } = majorityOf(longN, shortN);
+  const onCoin = longN + shortN;
+  const holdPct = denom > 0 ? wallets / denom : 0;
+  const hadPrev =
+    pnl?.prevLongN != null ||
+    pnl?.prevShortN != null ||
+    roi?.prevLongN != null ||
+    roi?.prevShortN != null;
+  const prevLong = votes(pnl?.prevLongN) + votes(roi?.prevLongN);
+  const prevShort = votes(pnl?.prevShortN) + votes(roi?.prevShortN);
   const prevHoldPct =
-    prevP != null && prevR != null ? geoMean(prevP, prevR) : null;
+    hadPrev && prevDenom > 0 ? majorityOf(prevLong, prevShort).wallets / prevDenom : null;
+  const pnlW = votes(pnl?.onCoin);
+  const roiW = votes(roi?.onCoin);
+  const levW = pnlW + roiW;
+  const leverage =
+    levW > 0
+      ? Math.max(
+          1,
+          Math.round(
+            ((pnl?.leverage ?? 0) * pnlW + (roi?.leverage ?? 0) * roiW) / levW,
+          ),
+        )
+      : src.leverage;
+  const priced = pnlW >= roiW ? pnl : roi;
   return {
     rank: 0,
-    coin: pnl.coin,
-    label: pnl.label,
-    dex: pnl.dex,
-    side: pnl.side,
-    wallets: Math.round((pnl.wallets + roi.wallets) / 2),
-    onCoin: Math.round((pnl.onCoin + roi.onCoin) / 2),
-    longN: Math.round((pnl.longN + roi.longN) / 2),
-    shortN: Math.round((pnl.shortN + roi.shortN) / 2),
+    coin: src.coin,
+    label: src.label,
+    dex: src.dex,
+    side,
+    wallets,
+    onCoin,
+    longN,
+    shortN,
     holdPct,
-    agreement: Math.min(pnl.agreement, roi.agreement),
-    leverage: Math.max(1, Math.round((pnl.leverage + roi.leverage) / 2)),
+    agreement: onCoin > 0 ? wallets / onCoin : 0,
+    leverage,
     rankDelta: null,
     prevHoldPct,
+    prevLongN: hadPrev ? prevLong : null,
+    prevShortN: hadPrev ? prevShort : null,
     holdDelta: prevHoldPct == null ? null : holdPct - prevHoldPct,
-    price: pnl.price ?? roi.price,
-    changePct: pnl.changePct ?? roi.changePct,
+    price: priced?.price ?? src.price,
+    changePct: priced?.changePct ?? src.changePct,
   };
 }
 
@@ -498,119 +562,241 @@ function combineBoards(pnl: BoardSnapshot, roi: BoardSnapshot): BoardSnapshot {
     return emptyBoard("both", { error: `ROI: ${roi.error}` });
   }
 
-  const roiByCoin = new Map(roi.rows.map((row) => [row.coin, row]));
+  const denom = Math.max(0, pnl.snappedOk) + Math.max(0, roi.snappedOk);
+  const prevDenom = (pnl.prevSnappedOk ?? 0) + (roi.prevSnappedOk ?? 0);
+  const pnlBy = new Map(pnl.rows.map((row) => [row.coin, row]));
+  const roiBy = new Map(roi.rows.map((row) => [row.coin, row]));
   const merged: PairRow[] = [];
-  for (const p of pnl.rows) {
-    const r = roiByCoin.get(p.coin);
-    if (!r || r.side !== p.side) continue;
-    merged.push(combinePair(p, r));
+  for (const coin of new Set([...pnlBy.keys(), ...roiBy.keys()])) {
+    const row = addPair(pnlBy.get(coin), roiBy.get(coin), denom, prevDenom);
+    if (row) merged.push(row);
   }
-  merged.sort((a, b) => b.holdPct - a.holdPct || b.wallets - a.wallets);
+  merged.sort(
+    (a, b) => b.wallets - a.wallets || b.holdPct - a.holdPct || a.coin.localeCompare(b.coin),
+  );
+  const prevOrder = [...merged]
+    .filter((row) => row.prevHoldPct != null)
+    .sort(
+      (a, b) =>
+        (b.prevHoldPct ?? 0) - (a.prevHoldPct ?? 0) || a.coin.localeCompare(b.coin),
+    );
+  const prevRank = new Map(prevOrder.map((row, i) => [row.coin, i + 1]));
   merged.forEach((row, i) => {
     row.rank = i + 1;
+    const prev = prevRank.get(row.coin);
+    row.rankDelta = prev == null ? null : prev - row.rank;
   });
 
-  const listed = Math.max(pnl.listed, roi.listed, 200);
-  const snappedOk = Math.min(pnl.snappedOk || listed, roi.snappedOk || listed);
+  const listed = Math.max(1, pnl.listed) + Math.max(1, roi.listed);
   const capturedAt = [pnl.capturedAt, roi.capturedAt]
     .filter(Boolean)
     .sort()
     .at(-1) ?? null;
+  const coverage =
+    pnl.coverage != null && roi.coverage != null && denom > 0
+      ? (pnl.coverage * pnl.snappedOk + roi.coverage * roi.snappedOk) / denom
+      : (pnl.coverage ?? roi.coverage);
 
   return {
     configured: true,
-    error: merged.length ? null : "No same-side overlap between PnL and ROI boards this hour",
+    error: merged.length ? null : "No pairs on the PnL or ROI board this hour",
     cycleTs: pnl.cycleTs || roi.cycleTs,
     capturedAt,
     listed,
-    snappedOk,
+    snappedOk: denom,
+    prevSnappedOk: prevDenom > 0 ? prevDenom : null,
     status: pnl.status === "ok" && roi.status === "ok" ? "ok" : pnl.status || roi.status,
-    coverage:
-      pnl.coverage != null && roi.coverage != null
-        ? Math.min(pnl.coverage, roi.coverage)
-        : (pnl.coverage ?? roi.coverage),
+    coverage,
     rankWindow: rankWindowLabel(RANK_WINDOW, "PnL + ROI"),
     ranker: "both",
     rows: merged,
   };
 }
 
-function combineHistories(
-  pnl: RankHistory,
-  roi: RankHistory,
-  overlapCoins: Set<string>,
-): RankHistory {
-  const roiByCoin = new Map(roi.series.map((s) => [s.coin, s]));
-  const hourMap = new Map<number, { ts: number; stamp: string }>();
-  for (const h of pnl.hours) hourMap.set(h.ts, h);
-  for (const h of roi.hours) {
-    if (hourMap.has(h.ts)) hourMap.set(h.ts, h);
-  }
-  // Only hours both collectors stored (same cycle_ts bucket).
-  const bothHours = new Set(pnl.hours.map((h) => h.ts));
-  const hours = [...hourMap.values()]
-    .filter((h) => bothHours.has(h.ts) && roi.hours.some((x) => x.ts === h.ts))
-    .sort((a, b) => a.ts - b.ts);
+type CoinHistRow = {
+  cycle_ts: Date | string;
+  snapped_ok: number | string | null;
+  coin: string | null;
+  long_n: number | string | null;
+  short_n: number | string | null;
+};
 
-  const series: RankHistorySeries[] = [];
-  for (const pSeries of pnl.series) {
-    if (!overlapCoins.has(pSeries.coin)) continue;
-    const rSeries = roiByCoin.get(pSeries.coin);
-    if (!rSeries) continue;
-    const rByTs = new Map(rSeries.points.map((pt) => [pt.ts, pt]));
-    const points: RankHistoryPoint[] = [];
-    for (const h of hours) {
-      const a = pSeries.points.find((pt) => pt.ts === h.ts);
-      const b = rByTs.get(h.ts);
-      if (!a || !b || a.side !== b.side) continue;
-      points.push({
-        ts: h.ts,
-        stamp: h.stamp,
-        rank: Math.min(a.rank, b.rank),
-        side: a.side,
-        holdPct: geoMean(a.holdPct, b.holdPct),
-        wallets: Math.round((a.wallets + b.wallets) / 2),
-      });
-    }
-    if (points.length < 1) continue;
-    series.push({
-      coin: pSeries.coin,
-      label: pSeries.label,
-      dex: pSeries.dex,
-      latestRank: points[points.length - 1].rank,
-      points,
-    });
-  }
-  series.sort((a, b) => {
-    const ah = a.points[a.points.length - 1]?.holdPct ?? 0;
-    const bh = b.points[b.points.length - 1]?.holdPct ?? 0;
-    return bh - ah;
-  });
-  return { hours, series: series.slice(0, RANK_CAP) };
+type HourBucket = {
+  ts: number;
+  stamp: string;
+  snappedOk: number;
+  coins: Map<string, { longN: number; shortN: number }>;
+};
+
+function hourBucket(ts: number): number {
+  return Math.floor(ts / 3_600_000) * 3_600_000;
 }
 
-/** Latest board for any tab. Combined view joins cached PnL + ROI — no extra SQL. */
+function indexCoinHistory(rows: CoinHistRow[]): Map<number, HourBucket> {
+  const byHour = new Map<number, HourBucket>();
+  for (const row of rows) {
+    const stamp = formatUtcStamp(row.cycle_ts);
+    if (!stamp) continue;
+    const ts = new Date(row.cycle_ts).getTime();
+    if (!Number.isFinite(ts)) continue;
+    const bucket = hourBucket(ts);
+    let hour = byHour.get(bucket);
+    if (!hour || ts > hour.ts) {
+      hour = {
+        ts,
+        stamp,
+        snappedOk: Math.max(0, Math.round(num(row.snapped_ok))),
+        coins: new Map(),
+      };
+      byHour.set(bucket, hour);
+    } else if (ts === hour.ts) {
+      hour.snappedOk = Math.max(hour.snappedOk, Math.round(num(row.snapped_ok)));
+    }
+    const coin = String(row.coin || "");
+    if (!coin || ts !== hour.ts) continue;
+    hour.coins.set(coin, {
+      longN: Math.max(0, Math.round(num(row.long_n))),
+      shortN: Math.max(0, Math.round(num(row.short_n))),
+    });
+  }
+  return byHour;
+}
+
+async function queryCoinHistory(
+  sql: SqlClient,
+  coins: string[],
+): Promise<CoinHistRow[]> {
+  if (!coins.length) return [];
+  return (await sql`
+    WITH hours AS (
+      SELECT cycle_ts, snapped_ok
+      FROM collector_runs
+      WHERE venue = ${VENUE}
+        AND status IN ('ok', 'partial')
+      ORDER BY cycle_ts DESC
+      LIMIT 24
+    )
+    SELECT
+      h.cycle_ts,
+      h.snapped_ok,
+      m.coin,
+      m.long_n,
+      m.short_n
+    FROM hours h
+    LEFT JOIN meta_index m
+      ON m.cycle_ts = h.cycle_ts
+     AND m.venue = ${VENUE}
+     AND m.coin = ANY(${coins})
+    ORDER BY h.cycle_ts ASC
+  `) as CoinHistRow[];
+}
+
+function buildAddedHistory(
+  coins: string[],
+  pnlRows: CoinHistRow[],
+  roiRows: CoinHistRow[],
+): RankHistory {
+  const pnlHours = indexCoinHistory(pnlRows);
+  const roiHours = indexCoinHistory(roiRows);
+  const buckets = [...new Set([...pnlHours.keys(), ...roiHours.keys()])].sort(
+    (a, b) => a - b,
+  );
+  const hours: RankHistory["hours"] = [];
+  const pointsByCoin = new Map<string, RankHistoryPoint[]>(
+    coins.map((coin) => [coin, []]),
+  );
+
+  for (const bucket of buckets) {
+    const pnl = pnlHours.get(bucket);
+    const roi = roiHours.get(bucket);
+    const denom = (pnl?.snappedOk ?? 0) + (roi?.snappedOk ?? 0);
+    if (denom <= 0) continue;
+    const ts = Math.max(pnl?.ts ?? 0, roi?.ts ?? 0);
+    const stamp = (pnl && roi ? (pnl.ts >= roi.ts ? pnl : roi) : (pnl ?? roi))
+      ?.stamp;
+    if (!stamp) continue;
+
+    const hourPoints: { coin: string; point: RankHistoryPoint }[] = [];
+    for (const coin of coins) {
+      const a = pnl?.coins.get(coin);
+      const b = roi?.coins.get(coin);
+      const longN = (a?.longN ?? 0) + (b?.longN ?? 0);
+      const shortN = (a?.shortN ?? 0) + (b?.shortN ?? 0);
+      if (longN + shortN <= 0) continue;
+      const { side, wallets } = majorityOf(longN, shortN);
+      hourPoints.push({
+        coin,
+        point: {
+          ts,
+          stamp,
+          rank: 0,
+          side,
+          holdPct: wallets / denom,
+          wallets,
+        },
+      });
+    }
+    if (!hourPoints.length) continue;
+    hours.push({ ts, stamp });
+    hourPoints.sort((x, y) => y.point.wallets - x.point.wallets);
+    hourPoints.forEach((row, i) => {
+      row.point.rank = i + 1;
+      pointsByCoin.get(row.coin)?.push(row.point);
+    });
+  }
+
+  const series: RankHistorySeries[] = [];
+  coins.forEach((coin, i) => {
+    const points = pointsByCoin.get(coin) ?? [];
+    if (!points.length) return;
+    const { label, dex } = splitCoin(coin);
+    series.push({
+      coin,
+      label,
+      dex,
+      latestRank: i + 1,
+      points,
+    });
+  });
+  return { hours, series };
+}
+
+async function loadCombinedRankHistory(coins: string[]): Promise<RankHistory> {
+  const pnlSql = getSql("pnl");
+  const roiSql = getSql("roi");
+  if (!pnlSql || !roiSql || !coins.length) return { hours: [], series: [] };
+  try {
+    const [pnlRows, roiRows] = await Promise.all([
+      queryCoinHistory(pnlSql, coins),
+      queryCoinHistory(roiSql, coins),
+    ]);
+    return buildAddedHistory(coins, pnlRows, roiRows);
+  } catch {
+    return { hours: [], series: [] };
+  }
+}
+
+function getCombinedRankHistory(coins: string[]): Promise<RankHistory> {
+  const key = coins.join("|");
+  return unstable_cache(
+    () => loadCombinedRankHistory(coins),
+    ["rank-history", VENUE, "both", key],
+    { revalidate: 60, tags: ["board", "board-pnl", "board-roi"] },
+  )();
+}
+
+/** Latest board for any tab. Combined view adds cached PnL + ROI — no extra SQL. */
 export async function getBoard(ranker: Ranker): Promise<BoardSnapshot> {
   if (ranker !== "both") return getLatestBoard(ranker);
   const [pnl, roi] = await Promise.all([getLatestBoard("pnl"), getLatestBoard("roi")]);
   return combineBoards(pnl, roi);
 }
 
-/** 24h hold series. Combined view joins cached histories in memory. */
+/** 24h hold series. Combined top 5 loads those coins from both Neons (5×24 each). */
 export async function getHistory(ranker: Ranker): Promise<RankHistory> {
   if (ranker !== "both") return getRankHistory(ranker);
-  const [pnlBoard, roiBoard, pnlH, roiH] = await Promise.all([
-    getLatestBoard("pnl"),
-    getLatestBoard("roi"),
-    getRankHistory("pnl"),
-    getRankHistory("roi"),
-  ]);
-  const overlap = new Set<string>();
-  const roiCoins = new Map(roiBoard.rows.map((r) => [r.coin, r]));
-  for (const p of pnlBoard.rows) {
-    const r = roiCoins.get(p.coin);
-    if (r && r.side === p.side) overlap.add(p.coin);
-  }
-  return combineHistories(pnlH, roiH, overlap);
+  const board = await getBoard("both");
+  const coins = board.rows.slice(0, RANK_CAP).map((row) => row.coin);
+  return getCombinedRankHistory(coins);
 }
 

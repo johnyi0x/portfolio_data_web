@@ -15,6 +15,8 @@ export type PairRow = {
   leverage: number;
   rankDelta: number | null;
   prevHoldPct: number | null;
+  prevLongN: number | null;
+  prevShortN: number | null;
   holdDelta: number | null;
   price: number | null;
   changePct: number | null;
@@ -27,6 +29,7 @@ export type BoardSnapshot = {
   capturedAt: string | null;
   listed: number;
   snappedOk: number;
+  prevSnappedOk: number | null;
   status: string | null;
   coverage: number | null;
   rankWindow: string;
